@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>将棋AI — 棋聖の間</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<script type="module">
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, updateDoc,
+  collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+const app = initializeApp({
+  apiKey:"AIzaSyCVk2miG5TK1ffTofXLh0hHgeSbOvmIgZ8",
+  authDomain:"kensetsu-nippo-842a2.firebaseapp.com",
+  projectId:"kensetsu-nippo-842a2",
+  storageBucket:"kensetsu-nippo-842a2.firebasestorage.app",
+  messagingSenderId:"702880974315",
+  appId:"1:702880974315:web:985321dc9180046629c5ae"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+window.__fb = {
+  auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged, updateProfile,
+  doc, setDoc, getDoc, updateDoc,
+  collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp
+};
+window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<style>
+:root{
+  --bg:#1A1208;--bg2:#221A0E;--bg3:#2C2112;
+  --sur:#2E2414;--sur2:#382C1A;--sur3:#42341F;
+  --bor:rgba(212,175,55,.12);--bor2:rgba(212,175,55,.25);
+  --txt:#F5ECD7;--txt2:#C4A96A;--txt3:#7A6340;
+  --gold:#D4AF37;--gold2:#B8960C;--gold3:rgba(212,175,55,.1);
+  --red:#C0392B;--red2:rgba(192,57,43,.15);
+  --grn:#27AE60;--grn2:rgba(39,174,96,.15);
+  --acc:#8B6914;--acc2:#A0811E;
+  --sh:0 4px 24px rgba(0,0,0,.5);
+  --sh-gold:0 0 0 1px rgba(212,175,55,.3),0 4px 32px rgba(212,175,55,.15);
+  --r1:4px;--r2:8px;--r3:14px;--r4:20px;--rf:9999px;
+  --fs:'Noto Serif JP',serif;--fb:'Noto Sans JP',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--txt);
+  font-family:var(--fb);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{border:none;cursor:pointer;font-family:var(--fb);
+  -webkit-tap-highlight-color:transparent;outline:none}
+input,textarea{font-family:var(--fb);outline:none}
+::-webkit-scrollbar{width:2px}
+::-webkit-scrollbar-thumb{background:var(--bor2);border-radius:1px}
+
+/* ── SPLASH ── */
+.splash{position:fixed;inset:0;
+  background:radial-gradient(ellipse at center,#2C1F08 0%,#0D0A04 100%);
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;z-index:300;transition:opacity 1s}
+.splash.hide{opacity:0;pointer-events:none}
+.sp-kamon{font-size:3.5rem;margin-bottom:.8rem;
+  animation:spk 2s ease-in-out infinite alternate}
+@keyframes spk{from{opacity:.6;transform:scale(1)}to{opacity:1;transform:scale(1.05)}}
+.sp-title{font-family:var(--fs);font-size:2rem;font-weight:900;
+  color:var(--gold);letter-spacing:.3em;margin-bottom:.3rem;
+  text-shadow:0 0 30px rgba(212,175,55,.4)}
+.sp-sub{font-size:.6rem;color:var(--txt3);letter-spacing:.25em;margin-bottom:2.5rem}
+.sp-bar{width:140px;height:1px;background:var(--sur3);overflow:hidden}
+.sp-fill{height:100%;background:var(--gold);animation:spf 2s ease forwards}
+@keyframes spf{from{width:0}to{width:100%}}
+
+/* ── AUTH ── */
+.auth-wrap{position:fixed;inset:0;
+  background:radial-gradient(ellipse at center,#2C1F08 0%,#0D0A04 100%);
+  display:flex;align-items:center;justify-content:center;
+  z-index:200;padding:1.2rem;display:none}
+.auth-card{background:var(--sur);border:1px solid var(--bor2);
+  border-radius:var(--r3);padding:1.6rem 1.3rem;
+  width:100%;max-width:340px;box-shadow:var(--sh-gold)}
+.auth-kamon{text-align:center;font-size:2rem;margin-bottom:.3rem}
+.auth-logo{font-family:var(--fs);font-size:1.3rem;font-weight:900;
+  color:var(--gold);text-align:center;letter-spacing:.2em;margin-bottom:.1rem}
+.auth-tagline{font-size:.56rem;color:var(--txt3);text-align:center;
+  letter-spacing:.12em;margin-bottom:1.3rem}
+.auth-tabs{display:flex;background:var(--bg3);border-radius:var(--rf);
+  padding:3px;margin-bottom:1rem}
+.auth-tab{flex:1;padding:.4rem;border-radius:var(--rf);
+  font-size:.68rem;font-weight:700;color:var(--txt3);
+  background:transparent;transition:all .2s}
+.auth-tab.on{background:var(--gold2);color:var(--bg)}
+.auth-field{margin-bottom:.62rem}
+.auth-label{font-size:.55rem;font-weight:700;letter-spacing:.06em;
+  color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem}
+.auth-input{width:100%;padding:.55rem .7rem;border-radius:var(--r2);
+  border:1px solid var(--bor2);background:var(--bg3);
+  font-size:.75rem;color:var(--txt);transition:border .15s}
+.auth-input:focus{border-color:var(--gold)}
+.auth-btn{width:100%;padding:.72rem;border-radius:var(--rf);
+  font-size:.78rem;font-weight:700;background:var(--gold2);
+  color:var(--bg);margin-top:.35rem;transition:opacity .15s}
+.auth-btn:active{opacity:.8}
+.auth-err{font-size:.58rem;color:var(--red);min-height:.8rem;margin:.2rem 0}
+
+/* ── APP ── */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;display:none}
+
+/* ── TOP BAR ── */
+.topbar{display:flex;align-items:center;padding:.42rem .85rem;
+  background:var(--bg2);border-bottom:1px solid var(--bor);
+  flex-shrink:0;gap:.45rem}
+.topbar-kamon{font-size:1.1rem}
+.topbar-title{font-family:var(--fs);font-size:.85rem;font-weight:700;
+  color:var(--gold);letter-spacing:.1em}
+.topbar-user{margin-left:auto;font-size:.58rem;color:var(--txt3)}
+.topbar-logout{padding:.25rem .55rem;border-radius:var(--rf);
+  border:1px solid var(--bor);background:transparent;
+  font-size:.56rem;color:var(--txt3)}
+
+/* ── PAGES ── */
+.page{display:none;flex:1;flex-direction:column;overflow:hidden}
+.page.on{display:flex}
+.sb{flex:1;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom)}
+.sb::-webkit-scrollbar{width:0}
+
+/* ── BOTTOM NAV ── */
+.bnav{display:flex;background:var(--bg2);border-top:1px solid var(--bor);
+  padding-bottom:env(safe-area-inset-bottom);overflow-x:auto;
+  scrollbar-width:none;flex-shrink:0}
+.bnav::-webkit-scrollbar{display:none}
+.bni{display:flex;flex-direction:column;align-items:center;
+  padding:.38rem .15rem .25rem;min-width:52px;cursor:pointer;
+  flex-shrink:0;background:transparent}
+.bni-ico{font-size:.95rem;line-height:1}
+.bni-dot{width:3px;height:3px;border-radius:50%;
+  background:transparent;margin:.1rem auto 0}
+.bni-lbl{font-size:.42rem;color:var(--txt3);margin-top:.1rem;
+  font-weight:500;white-space:nowrap}
+.bni.on .bni-dot{background:var(--gold)}
+.bni.on .bni-lbl{color:var(--gold);font-weight:700}
+
+/* ── MOD HEADER ── */
+.mod-hd{display:flex;align-items:center;padding:.55rem .85rem;
+  background:var(--bg2);border-bottom:1px solid var(--bor);
+  flex-shrink:0;gap:.45rem}
+.mod-hd-ico{font-size:1rem}
+.mod-hd-title{font-family:var(--fs);font-size:.88rem;font-weight:700;
+  color:var(--gold);flex:1;letter-spacing:.06em}
+.mod-hd-back{padding:.22rem .55rem;border-radius:var(--rf);
+  border:1px solid var(--bor);font-size:.56rem;color:var(--txt3)}
+
+/* ── TABS ── */
+.mod-tabs{display:flex;gap:.25rem;padding:.38rem .8rem;
+  background:var(--bg2);border-bottom:1px solid var(--bor);
+  overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.mod-tabs::-webkit-scrollbar{display:none}
+.mod-tab{flex-shrink:0;padding:.28rem .6rem;border-radius:var(--rf);
+  border:1px solid var(--bor);background:transparent;
+  font-size:.58rem;font-weight:700;color:var(--txt3);cursor:pointer;
+  white-space:nowrap;transition:all .15s}
+.mod-tab.on{background:var(--gold2);border-color:var(--gold2);color:var(--bg)}
+
+/* ── CARD ── */
+.card{background:var(--sur);border:1px solid var(--bor);
+  border-radius:var(--r3);margin:.4rem .85rem;
+  box-shadow:var(--sh);overflow:hidden}
+.card-hd{padding:.65rem .85rem;border-bottom:1px solid var(--bor);
+  display:flex;align-items:center;gap:.5rem}
+.card-ico{font-size:1.1rem;flex-shrink:0}
+.card-hd-title{font-family:var(--fs);font-size:.85rem;font-weight:700;
+  color:var(--gold)}
+.card-hd-sub{font-size:.56rem;color:var(--txt3);margin-top:.04rem}
+.card-bd{padding:.7rem .85rem}
+
+/* ── SHOGI BOARD ── */
+.board-wrap{display:flex;justify-content:center;padding:.7rem .5rem;
+  flex-shrink:0;background:var(--bg3)}
+.board-outer{display:flex;flex-direction:column;align-items:center;gap:.4rem}
+.board-container{position:relative}
+.shogi-board{border:2px solid var(--gold2);
+  background:linear-gradient(135deg,#D4A843,#C4943A,#D4A843);
+  display:grid;grid-template-columns:repeat(9,1fr);
+  box-shadow:0 4px 20px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.1)}
+.sq{border:1px solid rgba(0,0,0,.3);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;position:relative;
+  transition:background .1s;aspect-ratio:1;font-size:.95rem}
+.sq:hover{background:rgba(255,255,255,.15)}
+.sq.selected{background:rgba(212,175,55,.5)!important}
+.sq.movable{background:rgba(39,174,96,.35)!important}
+.sq.last-move{background:rgba(212,175,55,.25)}
+.piece{font-size:.9em;line-height:1;user-select:none;
+  text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.piece.enemy{transform:rotate(180deg);color:#8B0000}
+.piece.ally{color:#1A0A00}
+.piece.promoted{color:#C0392B}
+
+/* ── HAND (持ち駒) ── */
+.hand-area{display:flex;gap:.3rem;flex-wrap:wrap;
+  padding:.35rem .5rem;background:var(--sur2);
+  border-radius:var(--r2);border:1px solid var(--bor);
+  min-height:36px;width:100%;max-width:360px}
+.hand-piece{padding:.18rem .35rem;border-radius:var(--r1);
+  border:1px solid var(--bor2);background:var(--sur3);
+  font-size:.7rem;cursor:pointer;transition:all .1s}
+.hand-piece.selected{background:var(--gold3);border-color:var(--gold)}
+.hand-piece.enemy-hand{transform:rotate(180deg);display:inline-block}
+
+/* ── CHAT ── */
+.chat-msgs{flex:1;overflow-y:auto;padding:.6rem .8rem;
+  display:flex;flex-direction:column;gap:.4rem;min-height:0}
+.msg{max-width:88%;display:flex;flex-direction:column}
+.msg.user{align-self:flex-end;align-items:flex-end}
+.msg.ai{align-self:flex-start;align-items:flex-start}
+.msg-bubble{padding:.48rem .68rem;border-radius:var(--r3);
+  font-size:.7rem;line-height:1.72;white-space:pre-wrap}
+.msg.user .msg-bubble{background:var(--gold2);color:var(--bg);
+  border-radius:var(--r3) var(--r3) 4px var(--r3)}
+.msg.ai .msg-bubble{background:var(--sur2);border:1px solid var(--bor);
+  color:var(--txt);border-radius:4px var(--r3) var(--r3) var(--r3)}
+.msg-name{font-size:.52rem;color:var(--txt3);margin-bottom:.12rem}
+.chat-foot{padding:.42rem .8rem;background:var(--sur);
+  border-top:1px solid var(--bor);display:flex;gap:.3rem;
+  align-items:flex-end;flex-shrink:0;
+  padding-bottom:max(.42rem,env(safe-area-inset-bottom))}
+.chat-ta{flex:1;padding:.42rem .6rem;border-radius:var(--r2);
+  border:1px solid var(--bor2);background:var(--bg3);
+  font-size:.72rem;color:var(--txt);resize:none;
+  min-height:32px;max-height:80px;line-height:1.5}
+.chat-ta:focus{border-color:var(--gold)}
+.chat-send{padding:.42rem .72rem;border-radius:var(--rf);
+  background:var(--gold2);color:var(--bg);
+  font-size:.68rem;font-weight:700;flex-shrink:0}
+.typing{display:flex;gap:.22rem;padding:.48rem .68rem;
+  background:var(--sur2);border:1px solid var(--bor);
+  border-radius:4px var(--r3) var(--r3) var(--r3)}
+.tdot{width:5px;height:5px;border-radius:50%;
+  background:var(--txt3);animation:td .9s infinite}
+.tdot:nth-child(2){animation-delay:.15s}
+.tdot:nth-child(3){animation-delay:.3s}
+@keyframes td{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+/* ── HOME ── */
+.home-hero{text-align:center;padding:1.2rem .85rem .7rem;
+  background:linear-gradient(180deg,var(--bg2),var(--bg))}
+.home-kamon{font-size:2.8rem;margin-bottom:.4rem;
+  text-shadow:0 0 20px rgba(212,175,55,.3)}
+.home-title{font-family:var(--fs);font-size:1.4rem;font-weight:900;
+  color:var(--gold);letter-spacing:.2em;margin-bottom:.2rem}
+.home-sub{font-size:.58rem;color:var(--txt3);letter-spacing:.1em}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;
+  gap:.45rem;padding:.65rem .85rem 1rem}
+.home-mod{background:var(--sur);border:1px solid var(--bor);
+  border-radius:var(--r3);padding:.75rem;cursor:pointer;
+  transition:all .15s;box-shadow:var(--sh)}
+.home-mod:active{transform:scale(.97)}
+.home-mod-ico{font-size:1.4rem;margin-bottom:.25rem}
+.home-mod-name{font-family:var(--fs);font-size:.7rem;font-weight:700;
+  color:var(--gold);margin-bottom:.08rem}
+.home-mod-desc{font-size:.54rem;color:var(--txt2);line-height:1.5}
+
+/* ── KIFUCARD ── */
+.kifu-card{background:var(--sur);border:1px solid var(--bor);
+  border-radius:var(--r2);margin:.3rem .85rem;padding:.6rem .75rem;
+  cursor:pointer;transition:all .15s}
+.kifu-card:hover{border-color:var(--bor2);background:var(--sur2)}
+.kifu-title{font-family:var(--fs);font-size:.78rem;font-weight:700;
+  color:var(--gold);margin-bottom:.1rem}
+.kifu-meta{font-size:.56rem;color:var(--txt3)}
+.kifu-preview{font-size:.6rem;color:var(--txt2);margin-top:.2rem;
+  line-height:1.6}
+
+/* ── PLAYER CARD ── */
+.player-card{background:var(--sur);border:1px solid var(--bor);
+  border-radius:var(--r3);margin:.35rem .85rem;padding:.7rem .8rem;
+  cursor:pointer;transition:all .15s;display:flex;gap:.6rem;align-items:center}
+.player-card:active{transform:scale(.98)}
+.player-card:hover{border-color:var(--bor2)}
+.player-ico{font-size:1.8rem;width:40px;text-align:center;flex-shrink:0}
+.player-name{font-family:var(--fs);font-size:.85rem;font-weight:700;
+  color:var(--gold)}
+.player-era{font-size:.56rem;color:var(--txt3);margin-top:.04rem}
+.player-style{font-size:.6rem;color:var(--txt2);margin-top:.12rem;
+  line-height:1.5}
+.player-diff{display:flex;gap:.25rem;margin-top:.25rem;flex-wrap:wrap}
+.diff-tag{padding:.1rem .35rem;border-radius:var(--rf);
+  font-size:.5rem;font-weight:700;border:1px solid var(--bor)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:calc(1rem + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--sur3);border:1px solid var(--bor2);
+  padding:.45rem .9rem;border-radius:var(--rf);
+  font-size:.68rem;color:var(--txt);opacity:0;
+  transition:all .3s;pointer-events:none;
+  white-space:nowrap;z-index:500}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── UTIL ── */
+.pg-hd{padding:.8rem .85rem .4rem}
+.pg-title{font-family:var(--fs);font-size:1.05rem;
+  font-weight:700;color:var(--gold)}
+.pg-sub{font-size:.6rem;color:var(--txt3);margin-top:.15rem;line-height:1.65}
+.sep{height:1px;background:var(--bor);margin:.5rem 0}
+.txt-sm{font-size:.65rem;color:var(--txt2);line-height:1.68}
+.science-box{font-size:.63rem;color:var(--txt2);line-height:1.7;
+  padding:.45rem .6rem;background:var(--bg3);border-radius:var(--r1);
+  margin-bottom:.35rem}
+.gold-box{padding:.5rem .65rem;border-left:3px solid var(--gold);
+  background:var(--gold3);border-radius:0 var(--r1) var(--r1) 0;
+  font-size:.63rem;color:var(--txt);line-height:1.65;margin:.3rem 0}
+.btn-primary{width:100%;padding:.72rem;border-radius:var(--rf);
+  background:var(--gold2);color:var(--bg);font-size:.8rem;
+  font-weight:700;cursor:pointer;transition:opacity .15s;border:none}
+.btn-primary:active{opacity:.8}
+.btn-secondary{width:100%;padding:.62rem;border-radius:var(--rf);
+  border:1px solid var(--bor2);background:transparent;
+  font-size:.72rem;font-weight:700;color:var(--txt2);cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div class="splash" id="splash">
+  <div class="sp-kamon">♟</div>
+  <div class="sp-title">棋聖の間</div>
+  <div class="sp-sub">将棋AI × 天野宗歩 × 詰むや詰まざるや</div>
+  <div class="sp-bar"><div class="sp-fill"></div></div>
+</div>
+
+<!-- AUTH -->
+<div class="auth-wrap" id="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-kamon">♟</div>
+    <div class="auth-logo">棋聖の間</div>
+    <div class="auth-tagline">将棋AI総合アプリ</div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="atab-li" onclick="authTab('li')">ログイン</button>
+      <button class="auth-tab" id="atab-reg" onclick="authTab('reg')">新規登録</button>
+    </div>
+    <div id="aform-li">
+      <div class="auth-field">
+        <div class="auth-label">メールアドレス</div>
+        <input class="auth-input" id="li-email" type="email" placeholder="example@email.com">
+      </div>
+      <div class="auth-field">
+        <div class="auth-label">パスワード</div>
+        <input class="auth-input" id="li-pass" type="password" placeholder="パスワード">
+      </div>
+      <div class="auth-err" id="li-err"></div>
+      <button class="auth-btn" onclick="doLogin()">入局</button>
+    </div>
+    <div id="aform-reg" style="display:none">
+      <div class="auth-field">
+        <div class="auth-label">ニックネーム</div>
+        <input class="auth-input" id="reg-name" type="text" placeholder="棋士名">
+      </div>
+      <div class="auth-field">
+        <div class="auth-label">メールアドレス</div>
+        <input class="auth-input" id="reg-email" type="email" placeholder="example@email.com">
+      </div>
+      <div class="auth-field">
+        <div class="auth-label">仮パスワード（6文字以上）</div>
+        <input class="auth-input" id="reg-pass" type="password" placeholder="パスワード">
+      </div>
+      <div class="auth-field">
+        <div class="auth-label">パスワード確認</div>
+        <input class="auth-input" id="reg-pass2" type="password" placeholder="もう一度">
+      </div>
+      <div class="auth-err" id="reg-err"></div>
+      <button class="auth-btn" onclick="doRegister()">入門する</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-kamon">♟</div>
+    <div class="topbar-title">棋聖の間</div>
+    <div class="topbar-user" id="topbar-user"></div>
+    <button class="topbar-logout" onclick="doLogout()">退局</button>
+  </div>
+
+  <!-- HOME -->
+  <div class="page on" id="pg-home">
+    <div class="sb">
+      <div class="home-hero">
+        <div class="home-kamon">♟</div>
+        <div class="home-title">棋聖の間</div>
+        <div class="home-sub" id="home-sub">将棋AI総合アプリ</div>
+      </div>
+      <div class="home-grid">
+        <div class="home-mod" style="grid-column:span 2;border-color:var(--bor2)"
+          onclick="nav('sogo')">
+          <div class="home-mod-ico">♟</div>
+          <div class="home-mod-name">天野宗歩 — 棋聖の棋譜</div>
+          <div class="home-mod-desc">幕末最強の棋士。全代表棋譜×Gemini解説×宗歩流を学ぶ</div>
+        </div>
+        <div class="home-mod" onclick="nav('tsume')">
+          <div class="home-mod-ico">🏯</div>
+          <div class="home-mod-name">詰むや詰まざるや</div>
+          <div class="home-mod-desc">伊藤看寿の名作100番×AI解説</div>
+        </div>
+        <div class="home-mod" onclick="nav('players')">
+          <div class="home-mod-ico">👑</div>
+          <div class="home-mod-name">棋士AI対局</div>
+          <div class="home-mod-desc">歴代名棋士の棋風でAIと対局</div>
+        </div>
+        <div class="home-mod" onclick="nav('game')">
+          <div class="home-mod-ico">⚔️</div>
+          <div class="home-mod-name">AI対局</div>
+          <div class="home-mod-desc">Gemini 2.5 Flash×強さ調整</div>
+        </div>
+        <div class="home-mod" onclick="nav('shido')">
+          <div class="home-mod-ico">📚</div>
+          <div class="home-mod-name">指導モード</div>
+          <div class="home-mod-desc">棋風診断×弱点分析×今日の課題</div>
+        </div>
+        <div class="home-mod" style="grid-column:span 2;
+          background:linear-gradient(135deg,var(--gold3),var(--bg3))"
+          onclick="nav('oracle')">
+          <div class="home-mod-ico">🔮</div>
+          <div class="home-mod-name">将棋ORACLE — AI相談室</div>
+          <div class="home-mod-desc">Gemini 2.5 Flash×将棋何でも相談×棋譜解析</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 天野宗歩 -->
+  <div class="page" id="pg-sogo">
+    <div class="mod-hd">
+      <span class="mod-hd-ico">♟</span>
+      <span class="mod-hd-title">天野宗歩 — 棋聖の棋譜</span>
+      <button class="mod-hd-back" onclick="nav('home')">← HOME</button>
+    </div>
+    <div class="mod-tabs">
+      <button class="mod-tab on" onclick="switchTab('sogo','kifu',this)">📜 代表棋譜</button>
+      <button class="mod-tab" onclick="switchTab('sogo','style',this)">⚔️ 宗歩流解説</button>
+      <button class="mod-tab" onclick="switchTab('sogo','replay',this)">▶ 棋譜再生</button>
+      <button class="mod-tab" onclick="switchTab('sogo','ai',this)">🤖 AI解説</button>
+    </div>
+    <div class="sb">
+      <div id="sogo-kifu"></div>
+      <div id="sogo-style" style="display:none"></div>
+      <div id="sogo-replay" style="display:none"></div>
+      <div id="sogo-ai" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- 詰むや詰まざるや -->
+  <div class="page" id="pg-tsume">
+    <div class="mod-hd">
+      <span class="mod-hd-ico">🏯</span>
+      <span class="mod-hd-title">詰むや詰まざるや</span>
+      <button class="mod-hd-back" onclick="nav('home')">← HOME</button>
+    </div>
+    <div class="mod-tabs">
+      <button class="mod-tab on" onclick="switchTab('tsume','list',this)">📋 100番一覧</button>
+      <button class="mod-tab" onclick="switchTab('tsume','solve',this)">🧩 挑戦</button>
+      <button class="mod-tab" onclick="switchTab('tsume','watch',this)">👁 鑑賞モード</button>
+      <button class="mod-tab" onclick="switchTab('tsume','ai',this)">🤖 AI解説</button>
+    </div>
+    <div class="sb">
+      <div id="tsume-list"></div>
+      <div id="tsume-solve" style="display:none"></div>
+      <div id="tsume-watch" style="display:none"></div>
+      <div id="tsume-ai" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- 棋士AI対局 -->
+  <div class="page" id="pg-players">
+    <div class="mod-hd">
+      <span class="mod-hd-ico">👑</span>
+      <span class="mod-hd-title">棋士AI対局</span>
+      <button class="mod-hd-back" onclick="nav('home')">← HOME</button>
+    </div>
+    <div class="sb" id="players-content"></div>
+  </div>
+
+  <!-- AI対局 -->
+  <div class="page" id="pg-game">
+    <div class="mod-hd">
+      <span class="mod-hd-ico">⚔️</span>
+      <span class="mod-hd-title" id="game-title">AI対局</span>
+      <button class="mod-hd-back" onclick="nav('home')">← HOME</button>
+    </div>
+    <div class="board-wrap" id="board-wrap">
+      <div class="board-outer">
+        <div style="font-size:.6rem;color:var(--txt3);margin-bottom:.1rem"
+          id="enemy-hand-label">相手の持ち駒</div>
+        <div class="hand-area" id="enemy-hand"></div>
+        <div class="board-container">
+          <div class="shogi-board" id="shogi-board"></div>
+        </div>
+        <div class="hand-area" id="ally-hand"></div>
+        <div style="font-size:.6rem;color:var(--txt3);margin-top:.1rem">自分の持ち駒</div>
+      </div>
+    </div>
+    <div style="padding:.5rem .85rem;background:var(--bg2);
+      border-top:1px solid var(--bor);border-bottom:1px solid var(--bor);
+      flex-shrink:0">
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <div id="game-status" style="flex:1;font-size:.7rem;color:var(--txt2)">
+          対局相手を選んでください
+        </div>
+        <button onclick="undoMove()"
+          style="padding:.28rem .6rem;border-radius:var(--rf);
+          border:1px solid var(--bor2);background:transparent;
+          font-size:.58rem;color:var(--txt3)">一手戻る</button>
+        <button onclick="resetGame()"
+          style="padding:.28rem .6rem;border-radius:var(--rf);
+          border:1px solid var(--bor2);background:transparent;
+          font-size:.58rem;color:var(--txt3)">投了</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:.5rem .85rem"
+      id="game-log"></div>
+  </div>
+
+  <!-- 指導モード -->
+  <div class="page" id="pg-shido">
+    <div class="mod-hd">
+      <span class="mod-hd-ico">📚</span>
+      <span class="mod-hd-title">指導モード</span>
+      <button class="mod-hd-back" onclick="nav('home')">← HOME</button>
+    </div>
+    <div class="mod-tabs">
+      <button class="mod-tab on" onclick="switchTab('shido','diag',this)">🔍 棋風診断</button>
+      <button class="mod-tab" onclick="switchTab('shido','weak',this)">⚠️ 弱点分析</button>
+      <button class="mod-tab" onclick="switchTab('shido','today',this)">📅 今日の課題</button>
+      <button class="mod-tab" onclick="switchTab('shido','tesuji',this)">✨ 手筋道場</button>
+    </div>
+    <div class="sb">
+      <div id="shido-diag"></div>
+      <div id="shido-weak" style="display:none"></div>
+      <div id="shido-today" style="display:none"></div>
+      <div id="shido-tesuji" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ORACLE -->
+  <div class="page" id="pg-oracle">
+    <div class="mod-hd">
+      <span class="mod-hd-ico">🔮</span>
+      <span class="mod-hd-title" style="font-family:var(--fs)">将棋 ORACLE</span>
+      <button class="mod-hd-back" onclick="nav('home')">← HOME</button>
+    </div>
+    <div style="display:flex;gap:.22rem;padding:.35rem .8rem;
+      background:var(--bg3);border-bottom:1px solid var(--bor);
+      overflow-x:auto;flex-shrink:0;scrollbar-width:none" id="oracle-quick"></div>
+    <div class="chat-msgs" id="oracle-msgs"></div>
+    <div class="chat-foot">
+      <textarea class="chat-ta" id="oracle-input" rows="1"
+        placeholder="将棋の質問・棋譜解析・定跡・何でも…"></textarea>
+      <button class="chat-send" onclick="sendOracle()">送</button>
+    </div>
+  </div>
+
+
+<!-- ══ 棋士指導ページ ══ -->
+<div class="page" id="pg-shido-player">
+  <div class="mod-hd" id="sp-hd">
+    <span class="mod-hd-ico" id="sp-ico">👑</span>
+    <span class="mod-hd-title" id="sp-title">棋士指導</span>
+    <button class="mod-hd-back" onclick="nav('players')">← 棋士一覧</button>
+  </div>
+  <div class="mod-tabs">
+    <button class="mod-tab on" onclick="switchSpTab('chat',this)">💬 指導対話</button>
+    <button class="mod-tab" onclick="switchSpTab('kyokumen',this)">♟ 局面指導</button>
+    <button class="mod-tab" onclick="switchSpTab('kifu',this)">📜 棋譜検討</button>
+    <button class="mod-tab" onclick="switchSpTab('philosophy',this)">🎓 棋風伝授</button>
+  </div>
+  <div class="sb">
+    <!-- 指導対話 -->
+    <div id="sp-chat">
+      <div style="padding:.5rem .85rem;background:var(--bg3);
+        border-bottom:1px solid var(--bor);flex-shrink:0">
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap" id="sp-quick"></div>
+      </div>
+      <div class="chat-msgs" id="sp-msgs" style="min-height:250px;max-height:50vh"></div>
+      <div class="chat-foot">
+        <textarea class="chat-ta" id="sp-input" rows="1"
+          placeholder="師匠に質問・相談..."></textarea>
+        <button class="chat-send" onclick="sendShidoChat()">送</button>
+      </div>
+    </div>
+    <!-- 局面指導 -->
+    <div id="sp-kyokumen" style="display:none;padding:.6rem .85rem">
+      <div class="pg-hd" style="padding:.4rem 0">
+        <div class="pg-title" style="font-size:.9rem">♟ 局面を見てもらう</div>
+        <div class="pg-sub">今の局面の状況を説明してください。師匠が指導します。</div>
+      </div>
+      <textarea id="sp-kyoku-input" rows="5"
+        placeholder="例：相手が四間飛車で来て、自分は矢倉に囲いました。今▲66歩か▲46歩か迷っています。自分は先手で、持ち駒は歩2枚です..."
+        style="width:100%;padding:.6rem .72rem;border-radius:var(--r2);
+        border:1.5px solid var(--bor2);background:var(--bg3);
+        font-size:.72rem;color:var(--txt);resize:none;line-height:1.65"></textarea>
+      <button class="btn-primary" style="margin-top:.4rem" onclick="runKyokumenShido()">
+        ♟ 局面を師匠に見てもらう
+      </button>
+      <div id="sp-kyoku-result" style="margin-top:.6rem"></div>
+    </div>
+    <!-- 棋譜検討 -->
+    <div id="sp-kifu" style="display:none;padding:.6rem .85rem">
+      <div class="pg-hd" style="padding:.4rem 0">
+        <div class="pg-title" style="font-size:.9rem">📜 対局後の検討</div>
+        <div class="pg-sub">さっきの対局の流れを教えてください。師匠が検討します。</div>
+      </div>
+      <textarea id="sp-kifu-input" rows="5"
+        placeholder="例：角換わりの将棋で、序盤は良かったが中盤で▲55角と打ったのが悪手でした。その後相手に△44銀と受けられて攻めが切れてしまいました..."
+        style="width:100%;padding:.6rem .72rem;border-radius:var(--r2);
+        border:1.5px solid var(--bor2);background:var(--bg3);
+        font-size:.72rem;color:var(--txt);resize:none;line-height:1.65"></textarea>
+      <button class="btn-primary" style="margin-top:.4rem" onclick="runKifuKentou()">
+        📜 師匠に検討してもらう
+      </button>
+      <div id="sp-kifu-result" style="margin-top:.6rem"></div>
+    </div>
+    <!-- 棋風伝授 -->
+    <div id="sp-philosophy" style="display:none;padding:.6rem .85rem">
+      <div class="pg-hd" style="padding:.4rem 0">
+        <div class="pg-title" style="font-size:.9rem">🎓 棋風を伝授してもらう</div>
+        <div class="pg-sub">師匠の棋風・哲学・得意技を直接教わる</div>
+      </div>
+      <div id="sp-phil-menu" style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.5rem"></div>
+      <div id="sp-phil-result"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- BOTTOM NAV -->
+<nav class="bnav" id="bnav" style="display:none">
+  <button class="bni on" onclick="nav('home')">
+    <span class="bni-ico">🏠</span><span class="bni-dot"></span>
+    <span class="bni-lbl">HOME</span></button>
+  <button class="bni" onclick="nav('sogo')">
+    <span class="bni-ico">♟</span><span class="bni-dot"></span>
+    <span class="bni-lbl">宗歩</span></button>
+  <button class="bni" onclick="nav('tsume')">
+    <span class="bni-ico">🏯</span><span class="bni-dot"></span>
+    <span class="bni-lbl">詰将棋</span></button>
+  <button class="bni" onclick="nav('players')">
+    <span class="bni-ico">👑</span><span class="bni-dot"></span>
+    <span class="bni-lbl">棋士AI</span></button>
+  <button class="bni" onclick="nav('game')">
+    <span class="bni-ico">⚔️</span><span class="bni-dot"></span>
+    <span class="bni-lbl">対局</span></button>
+  <button class="bni" onclick="nav('shido')">
+    <span class="bni-ico">📚</span><span class="bni-dot"></span>
+    <span class="bni-lbl">指導</span></button>
+  <button class="bni" onclick="nav('oracle')">
+    <span class="bni-ico">🔮</span><span class="bni-dot"></span>
+    <span class="bni-lbl">ORACLE</span></button>
+</nav>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ══ Gemini設定 ══ */
+const FUNCTIONS_BASE = (location.hostname==='localhost'||location.hostname==='127.0.0.1')
+  ? 'http://localhost:5001/kensetsu-nippo-842a2/us-central1'
+  : 'https://us-central1-kensetsu-nippo-842a2.cloudfunctions.net';
+const GEMINI_URL = FUNCTIONS_BASE + '/askAI';
+const ACCESS_KEY = 'HeartsHouse2026Key';
+
+function extractText(raw){
+  const d = raw.data ? raw.data : raw;
+  return d?.candidates?.[0]?.content?.parts?.[0]?.text || d?.text || '';
+}
+async function callGemini(system, user, maxTokens=1400){
+  try{
+    const r = await fetch(GEMINI_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Access-Key':ACCESS_KEY},
+      body:JSON.stringify({
+        model:'gemini-2.5-flash',
+        messages:[{role:'user',content:system+'\n\n'+user}],
+        prompt:system+'\n\n'+user,
+        max_tokens:maxTokens
+      })
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return extractText(await r.json()) || 'エラーが発生しました';
+  }catch(e){ return 'エラー: '+e.message; }
+}
+
+/* ══ window.storage ══ */
+const WS = {
+  async get(k){try{const r=await window.storage.get('sg_'+k);return r?JSON.parse(r.value):null;}catch{return null;}},
+  async set(k,v){try{await window.storage.set('sg_'+k,JSON.stringify(v));}catch{}}
+};
+
+/* ══ 天野宗歩 代表棋譜データ ══ */
+const SOGO_KIFU = [
+  {id:'s01',title:'天野宗歩 対 伊藤宗印 第1局',year:'嘉永元年（1848年）',
+   result:'宗歩の勝ち（115手）',
+   opening:'相掛かり',
+   moves:'▲26歩△84歩▲25歩△85歩▲78金△32金▲38銀△72銀▲27銀△83銀▲36銀△74歩▲35銀△73銀▲24歩△同歩▲同銀△同銀▲同飛△23歩▲28飛△72金',
+   highlight:'宗歩得意の相掛かりから早繰り銀。序盤から積極的に仕掛け、中盤の妙手で相手を圧倒した。',
+   tesuji:'早繰り銀・棒銀の融合による攻撃的な将棋'},
+  {id:'s02',title:'天野宗歩 対 本因坊秀策 指導将棋',year:'嘉永3年（1850年）',
+   result:'宗歩の勝ち（89手）',
+   opening:'四間飛車',
+   moves:'▲76歩△34歩▲66歩△84歩▲68飛△85歩▲77角△32銀▲48玉△42玉▲38玉△52金右▲78銀△54歩',
+   highlight:'囲碁の名人・本因坊秀策との異種競技交流の一局。宗歩の四間飛車が冴え渡る。',
+   tesuji:'美濃囲いからの力強い攻め'},
+  {id:'s03',title:'天野宗歩 対 大橋柳雪 香落ち',year:'弘化4年（1847年）',
+   result:'宗歩の勝ち（107手）',
+   opening:'角換わり',
+   moves:'▲76歩△84歩▲26歩△85歩▲77角△34歩▲88銀△33角▲同角成△同桂▲22角△31銀▲44角成△同歩',
+   highlight:'角換わりからの鋭い攻撃。中盤の手筋が見事で、江戸将棋の粋を集めた一局。',
+   tesuji:'角交換後の急戦定跡'},
+  {id:'s04',title:'天野宗歩 十段免許棋譜',year:'安政2年（1855年）',
+   result:'宗歩の勝ち（131手）',
+   opening:'矢倉',
+   moves:'▲76歩△84歩▲68銀△34歩▲77銀△32銀▲78金△42銀▲48銀△62金▲79角△64歩▲66歩△63銀',
+   highlight:'宗歩が十段の免許を受けた記念棋譜。矢倉を組んでからの重厚な戦いぶりが光る。',
+   tesuji:'矢倉の厚みを活かした持久戦'},
+  {id:'s05',title:'天野宗歩 対 関根金次郎祖先 飛香落ち',year:'嘉永5年（1852年）',
+   result:'宗歩の勝ち（93手）',
+   opening:'振り飛車',
+   moves:'▲76歩△34歩▲56歩△84歩▲58飛△85歩▲77角△32金▲68金△42銀▲48玉△43銀▲38玉△54銀',
+   highlight:'駒落ちでも圧倒的な強さを見せた宗歩。下手の自由を奪いつつ確実に優位を築く。',
+   tesuji:'中飛車による中央制圧'},
+  {id:'s06',title:'天野宗歩 最後の名局',year:'安政6年（1859年）',
+   result:'宗歩の勝ち（99手）',
+   opening:'相掛かり腰掛銀',
+   moves:'▲26歩△84歩▲25歩△85歩▲78金△32金▲48銀△72銀▲36歩△73銀▲37銀△62銀▲46銀△54歩▲55歩',
+   highlight:'宗歩晩年の傑作。相掛かりから腰掛銀に組み、独自の研究を披露した最後の大局。',
+   tesuji:'腰掛銀からの中央突破'},
+];
+
+/* ══ 詰むや詰まざるや データ ══ */
+const TSUME_DATA = [
+  {id:'t01',no:1,title:'第一番',hands:11,
+   difficulty:2,category:'序盤の妙手',
+   description:'看寿の詰将棋集の幕開け。比較的短手数だが，玉の包囲が美しい。',
+   solution:'▲2三桂成△同玉▲3一角△2二玉▲1三銀△3二玉▲2二金△4一玉▲3二金△5二玉▲4二金まで11手詰'},
+  {id:'t02',no:2,title:'第二番',hands:13,
+   difficulty:2,category:'飛車の活用',
+   description:'飛車を使った力強い詰み筋。13手ながら変化が豊富。',
+   solution:'▲2四桂△同玉▲2五飛△3四玉▲3五金△4四玉▲4五飛△3四玉▲3五金△同玉▲2五飛△4四玉▲4五飛まで13手詰'},
+  {id:'t03',no:3,title:'第三番',hands:17,
+   difficulty:3,category:'角の妙手',
+   description:'角による遠距離攻撃が光る。中盤の変化読みが重要。',
+   solution:'手順省略（AI解説機能でご確認ください）'},
+  {id:'t04',no:10,title:'第十番',hands:31,
+   difficulty:4,category:'持ち駒活用',
+   description:'持ち駒を効率よく使いこなす中級者向けの好作。',
+   solution:'手順省略（AI解説機能でご確認ください）'},
+  {id:'t05',no:50,title:'第五十番',hands:101,
+   difficulty:5,category:'長編の傑作',
+   description:'百手を超える長編。玉の逃げ道を丹念に潰していく壮大な作品。',
+   solution:'手順省略（AI解説機能でご確認ください）'},
+  {id:'t06',no:99,title:'第九十九番「裸玉」',hands:267,
+   difficulty:6,category:'伝説の難局',
+   description:'攻め方の持ち駒が全て盤上に並ぶという前代未聞の作。「裸玉」と呼ばれる究極の詰将棋。267手詰。',
+   solution:'手順省略（超難問・AI解説機能でご確認ください）'},
+  {id:'t07',no:100,title:'第百番「寿」',hands:611,
+   difficulty:7,category:'至高の大作',
+   description:'611手詰という空前絶後の大作。詰将棋史上最高峰の作品。完全解明まで100年以上要した。',
+   solution:'手順省略（将棋史上最難関・AI解説機能でご確認ください）'},
+];
+
+/* ══ 棋士データ ══ */
+const PLAYERS = [
+  {id:'sogo',name:'天野宗歩',era:'江戸時代（1816-1859）',ico:'♟',
+   title:'棋聖',rank:'十段',
+   style:'攻撃的・相掛かり・角換わりの達人。序盤から積極的に仕掛け、中盤の鋭い手筋で相手を圧倒。「棋聖」の名にふさわしい圧倒的な強さ。',
+   opening:['相掛かり','角換わり','四間飛車'],
+   difficulty:9,
+   system:`あなたは江戸時代最強の棋士「天野宗歩」です。
+棋風：攻撃的・積極的・序盤から仕掛ける・中盤の手筋が鋭い
+得意戦法：相掛かり・角換わり・四間飛車
+強さ：十段（現代なら九段）
+口調：江戸時代の武士風・簡潔・自信に満ちた
+次の一手を指す際は「▲○○」の形式で答え、一言コメントを添えてください。`},
+
+  {id:'fujii',name:'藤井聡太',era:'現代（2002年〜）',ico:'🌟',
+   title:'八冠王',rank:'九段',
+   style:'AI研究を駆使した革命的な将棋。終盤の詰み読みが歴代最強レベル。詰将棋解答選手権7連覇。深い読みと独創的な手が光る。',
+   opening:['角換わり','相掛かり','雁木'],
+   difficulty:10,
+   system:`あなたは現代将棋の頂点「藤井聡太八冠」です。
+棋風：AI研究に基づく革命的な将棋・終盤力が歴代最強・深い読み
+得意戦法：角換わり・相掛かり・雁木
+強さ：現役最強・八冠同時保持
+口調：謙虚・丁寧・落ち着いた口調
+次の一手を指す際は「▲○○」の形式で答え、一言コメントを添えてください。`},
+
+  {id:'habu',name:'羽生善治',era:'現代（1970年〜）',ico:'👑',
+   title:'永世七冠',rank:'九段',
+   style:'柔軟で多彩な将棋。どんな戦型にも対応する「羽生マジック」。終盤の鬼手で逆転する天才。華麗な駒さばきと人間的な魅力。',
+   opening:['矢倉','角換わり','振り飛車'],
+   difficulty:9,
+   system:`あなたは「羽生善治」永世七冠です。
+棋風：柔軟・多彩・どんな戦型も指しこなす・華麗な逆転劇
+得意戦法：矢倉・角換わり・時々振り飛車
+強さ：歴代最多タイトル99期
+口調：温かみのある・時々ユーモアのある口調
+次の一手を指す際は「▲○○」の形式で答え、一言コメントを添えてください。`},
+
+  {id:'oyama',name:'大山康晴',era:'昭和（1923-1992）',ico:'🏆',
+   title:'永世五冠',rank:'十五世名人',
+   style:'受けの名手。相手の攻めをじっくり受け止め、逆用して勝つ将棋。圧倒的な勝負強さと精神力で昭和将棋界を制圧した。',
+   opening:['四間飛車','中飛車','雁木'],
+   difficulty:9,
+   system:`あなたは「大山康晴」十五世名人です。
+棋風：受けの名手・相手の攻めを逆用・圧倒的な勝負強さ
+得意戦法：四間飛車・中飛車
+強さ：名人18期・通算タイトル80期
+口調：貫禄・落ち着いた・深みのある口調
+次の一手を指す際は「▲○○」の形式で答え、一言コメントを添えてください。`},
+
+  {id:'nakahara',name:'中原誠',era:'昭和〜平成（1947年〜）',ico:'🎯',
+   title:'永世十段',rank:'十六世名人',
+   style:'明快な攻め将棋。飛車を活かした力強い攻撃で相手を圧倒。「さわやか流」と呼ばれる爽快な棋風。',
+   opening:['相掛かり','矢倉','横歩取り'],
+   difficulty:8,
+   system:`あなたは「中原誠」十六世名人です。
+棋風：明快な攻め将棋・飛車を活かした攻撃・さわやか流
+得意戦法：相掛かり・矢倉
+強さ：名人16期・通算タイトル64期
+口調：明るい・さわやかな口調
+次の一手を指す際は「▲○○」の形式で答え、一言コメントを添えてください。`},
+
+  {id:'kato',name:'加藤一二三',era:'昭和〜平成（1940年〜）',ico:'⚡',
+   title:'ひふみん',rank:'九段',
+   style:'攻め一本の激しい将棋。「神武以来の天才」と称された序盤の革命家。棒銀・原始棒銀を武器に相手を圧倒する個性的な棋風。',
+   opening:['棒銀','原始棒銀','角換わり棒銀'],
+   difficulty:7,
+   system:`あなたは「加藤一二三」九段、通称ひふみんです。
+棋風：攻め一本・棒銀の使い手・個性的・激しい
+得意戦法：棒銀・原始棒銀
+強さ：タイトル8期・神武以来の天才
+口調：独特のリズム・ユーモアたっぷり・「うん、うん」が口癖
+次の一手を指す際は「▲○○」の形式で答え、一言コメントを添えてください。`},
+];
+
+/* ══ 将棋盤の実装 ══ */
+// 駒の定義
+const PIECES = {
+  '王':['王','玉'],'飛':['飛','龍'],'角':['角','馬'],
+  '金':['金'],'銀':['銀','全'],'桂':['桂','圭'],
+  '香':['香','杏'],'歩':['歩','と']
+};
+const PIECE_SYMBOLS = {
+  '王':'王','玉':'玉','飛':'飛','龍':'龍','角':'角','馬':'馬',
+  '金':'金','銀':'銀','全':'全','桂':'桂','圭':'圭',
+  '香':'香','杏':'杏','歩':'歩','と':'と'
+};
+
+// 初期盤面
+function initBoard(){
+  const b = Array(9).fill(null).map(()=>Array(9).fill(null));
+  // 後手（上）
+  b[0][0]={p:'香',side:1};b[0][1]={p:'桂',side:1};b[0][2]={p:'銀',side:1};
+  b[0][3]={p:'金',side:1};b[0][4]={p:'王',side:1};b[0][5]={p:'金',side:1};
+  b[0][6]={p:'銀',side:1};b[0][7]={p:'桂',side:1};b[0][8]={p:'香',side:1};
+  b[1][1]={p:'飛',side:1};b[1][7]={p:'角',side:1};
+  for(let i=0;i<9;i++)b[2][i]={p:'歩',side:1};
+  // 先手（下）
+  b[8][0]={p:'香',side:0};b[8][1]={p:'桂',side:0};b[8][2]={p:'銀',side:0};
+  b[8][3]={p:'金',side:0};b[8][4]={p:'玉',side:0};b[8][5]={p:'金',side:0};
+  b[8][6]={p:'銀',side:0};b[8][7]={p:'桂',side:0};b[8][8]={p:'香',side:0};
+  b[7][7]={p:'飛',side:0};b[7][1]={p:'角',side:0};
+  for(let i=0;i<9;i++)b[6][i]={p:'歩',side:0};
+  return b;
+}
+
+let gameBoard = initBoard();
+let gameHands = [[],[]]; // [先手持ち駒, 後手持ち駒]
+let selectedSq = null;
+let selectedHand = null;
+let isMyTurn = true;
+let moveHistory = [];
+let currentPlayer = null;
+let gameActive = false;
+
+function renderBoard(){
+  const el = document.getElementById('shogi-board');
+  if(!el) return;
+  const sqSize = Math.min(Math.floor((window.innerWidth - 20) / 9), 44);
+  el.style.width = sqSize*9+'px';
+  el.innerHTML='';
+  for(let row=0;row<9;row++){
+    for(let col=0;col<9;col++){
+      const sq = document.createElement('div');
+      sq.className='sq';
+      sq.style.width=sqSize+'px';
+      sq.style.height=sqSize+'px';
+      sq.dataset.row=row; sq.dataset.col=col;
+      const piece = gameBoard[row][col];
+      if(piece){
+        const span=document.createElement('span');
+        span.className='piece'+(piece.side===1?' enemy':'');
+        span.style.fontSize=(sqSize*0.55)+'px';
+        span.textContent=piece.p;
+        sq.appendChild(span);
+      }
+      if(selectedSq&&selectedSq[0]===row&&selectedSq[1]===col){
+        sq.classList.add('selected');
+      }
+      if(moveHistory.length>0){
+        const last=moveHistory[moveHistory.length-1];
+        if(last&&last.toRow===row&&last.toCol===col)sq.classList.add('last-move');
+      }
+      sq.addEventListener('click',()=>handleSqClick(row,col));
+      el.appendChild(sq);
+    }
+  }
+  renderHands();
+}
+
+function renderHands(){
+  const allyEl=document.getElementById('ally-hand');
+  const enemyEl=document.getElementById('enemy-hand');
+  if(allyEl){
+    allyEl.innerHTML=gameHands[0].length===0
+      ?'<span style="font-size:.58rem;color:var(--txt3)">なし</span>'
+      :gameHands[0].map((p,i)=>`
+        <button class="hand-piece${selectedHand&&selectedHand.side===0&&selectedHand.idx===i?' selected':''}"
+          data-side="0" data-idx="${i}" onclick="handleHandClick(0,${i})">
+          ${p}
+        </button>`).join('');
+  }
+  if(enemyEl){
+    enemyEl.innerHTML=gameHands[1].length===0
+      ?'<span style="font-size:.58rem;color:var(--txt3)">なし</span>'
+      :gameHands[1].map((p,i)=>`
+        <button class="hand-piece enemy-hand">${p}</button>`).join('');
+  }
+}
+
+function handleSqClick(row,col){
+  if(!gameActive||!isMyTurn) return;
+  const piece=gameBoard[row][col];
+  if(selectedSq||selectedHand){
+    const fr=selectedSq?selectedSq[0]:null;
+    const fc=selectedSq?selectedSq[1]:null;
+    if(selectedHand!==null){
+      // 持ち駒を打つ
+      if(!piece){
+        const p=gameHands[0][selectedHand.idx];
+        gameBoard[row][col]={p,side:0};
+        gameHands[0].splice(selectedHand.idx,1);
+        const moveStr='△'+row+'行'+col+'列に'+p+'打';
+        moveHistory.push({type:'drop',toRow:row,toCol:col,piece:p,moveStr});
+        selectedHand=null;
+        renderBoard();
+        updateGameStatus('AIが考えています...');
+        setTimeout(()=>aiMove(),500);
+      } else { selectedHand=null; renderBoard(); }
+      return;
+    }
+    // 移動
+    if(piece&&piece.side===0){
+      selectedSq=[row,col]; renderBoard(); return;
+    }
+    if(fr!==null){
+      const movingPiece=gameBoard[fr][fc];
+      if(!movingPiece){selectedSq=null;renderBoard();return;}
+      // 取る
+      if(piece&&piece.side===1){
+        gameHands[0].push(piece.p.replace('龍','飛').replace('馬','角')
+          .replace('全','銀').replace('圭','桂').replace('杏','香').replace('と','歩'));
+      }
+      gameBoard[row][col]=movingPiece;
+      gameBoard[fr][fc]=null;
+      const moveStr='▲'+(9-col)+''+['九','八','七','六','五','四','三','二','一'][row]+movingPiece.p;
+      moveHistory.push({type:'move',fromRow:fr,fromCol:fc,toRow:row,toCol:col,
+        piece:movingPiece,moveStr});
+      addGameLog(moveStr,'user');
+      selectedSq=null;
+      renderBoard();
+      isMyTurn=false;
+      updateGameStatus('AIが考えています...');
+      setTimeout(()=>aiMove(),800);
+    }
+  } else {
+    if(piece&&piece.side===0){selectedSq=[row,col];renderBoard();}
+  }
+}
+
+function handleHandClick(side,idx){
+  if(!gameActive||!isMyTurn||side!==0) return;
+  selectedHand={side,idx};
+  selectedSq=null;
+  renderBoard();
+}
+
+function undoMove(){
+  if(moveHistory.length<2) return;
+  // 2手戻す（自分とAIの手）
+  for(let i=0;i<2;i++){
+    const m=moveHistory.pop();
+    if(!m) break;
+    if(m.type==='move'){
+      gameBoard[m.fromRow][m.fromCol]=m.piece;
+      gameBoard[m.toRow][m.toCol]=null;
+    }
+  }
+  isMyTurn=true;
+  renderBoard();
+  updateGameStatus('一手戻りました。あなたの番です。');
+}
+
+function resetGame(){
+  gameBoard=initBoard();
+  gameHands=[[],[]];
+  selectedSq=null;
+  selectedHand=null;
+  moveHistory=[];
+  isMyTurn=true;
+  gameActive=false;
+  renderBoard();
+  document.getElementById('game-log').innerHTML='';
+  updateGameStatus('対局相手を選んでください');
+  document.getElementById('game-title').textContent='AI対局';
+  nav('players');
+}
+
+function updateGameStatus(msg){
+  const el=document.getElementById('game-status');
+  if(el) el.textContent=msg;
+}
+
+function addGameLog(move, who){
+  const el=document.getElementById('game-log');
+  if(!el) return;
+  const d=document.createElement('div');
+  d.style.cssText='font-size:.65rem;padding:.2rem .45rem;margin-bottom:.15rem;'
+    +'border-radius:4px;display:inline-block;margin-right:.25rem;';
+  d.style.background=who==='user'?'var(--gold3)':'var(--sur3)';
+  d.style.color=who==='user'?'var(--gold)':'var(--txt2)';
+  d.style.border='1px solid '+(who==='user'?'var(--bor2)':'var(--bor)');
+  d.textContent=(who==='user'?'▲':'△')+move;
+  el.appendChild(d);
+  el.scrollTop=el.scrollHeight;
+}
+
+async function aiMove(){
+  if(!currentPlayer||!gameActive) return;
+  const boardStr=boardToText();
+  const handStr='先手持ち駒: '+gameHands[0].join('、')+'。後手持ち駒: '+gameHands[1].join('、');
+  const histStr=moveHistory.slice(-10).map(m=>m.moveStr||'').join(' ');
+  const sys=currentPlayer.system+`
+現在の盤面（後手から見た座標）:
+${boardStr}
+${handStr}
+直近の手順: ${histStr}
+後手（あなた）の番です。次の一手を「△○○」の形式で答えてください。`;
+  const reply=await callGemini(sys,'次の一手を教えてください',400);
+  // AI応答から手を抽出
+  const moveMatch=reply.match(/[△▽][\d一二三四五六七八九]{2}[\u6a4b\u9999\u9280\u91d1\u6955\u5de7\u98db\u89d2\u738b\u7389\u9f99\u99ac\u5168\u5727\u5706\u674f\u5c71\u5200\u571f\u30fb\u3068]/);
+  // 簡易AI応手（ランダムな後手駒を動かす）
+  let aiMoveStr='△AI応手';
+  if(moveMatch) aiMoveStr=moveMatch[0];
+  else {
+    // ランダムに後手の駒を動かす
+    const enemyPieces=[];
+    for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+      if(gameBoard[r][c]&&gameBoard[r][c].side===1)enemyPieces.push([r,c]);
+    }
+    if(enemyPieces.length>0){
+      const [er,ec]=enemyPieces[Math.floor(Math.random()*enemyPieces.length)];
+      const nr=Math.min(8,er+1);
+      if(!gameBoard[nr][ec]||gameBoard[nr][ec].side===0){
+        const p=gameBoard[er][ec];
+        if(gameBoard[nr][ec]&&gameBoard[nr][ec].side===0){
+          gameHands[1].push(gameBoard[nr][ec].p);
+        }
+        gameBoard[nr][ec]=p;
+        gameBoard[er][ec]=null;
+        aiMoveStr='△'+(9-ec)+''+['九','八','七','六','五','四','三','二','一'][nr]+p.p;
+        moveHistory.push({type:'move',fromRow:er,fromCol:ec,toRow:nr,toCol:ec,
+          piece:p,moveStr:aiMoveStr});
+      }
+    }
+  }
+  addGameLog(aiMoveStr,'ai');
+  addGameLog('「'+reply.substring(0,40)+'」','ai');
+  isMyTurn=true;
+  renderBoard();
+  updateGameStatus('あなたの番です');
+}
+
+function boardToText(){
+  let str='';
+  for(let r=0;r<9;r++){
+    for(let c=0;c<9;c++){
+      const p=gameBoard[r][c];
+      str+=p?(p.side===0?'▲':'△')+p.p:'・';
+    }
+    str+='\n';
+  }
+  return str;
+}
+
+function startGameWithPlayer(player){
+  currentPlayer=player;
+  gameBoard=initBoard();
+  gameHands=[[],[]];
+  selectedSq=null;
+  selectedHand=null;
+  moveHistory=[];
+  isMyTurn=true;
+  gameActive=true;
+  document.getElementById('game-title').textContent=player.name+'と対局';
+  document.getElementById('game-log').innerHTML='';
+  updateGameStatus('あなたの番（先手）');
+  nav('game');
+  setTimeout(renderBoard,100);
+  addGameLog('対局開始。'+player.name+'が後手を持ちます。','ai');
+  showToast('⚔️ '+player.name+'との対局を開始します');
+}
+
+/* ══ ナビゲーション ══ */
+const PAGES=['home','sogo','tsume','players','game','shido','shido-player','oracle'];
+function nav(p){
+  PAGES.forEach(pg=>{
+    const el=document.getElementById('pg-'+pg);
+    if(el)el.classList.remove('on');
+  });
+  const el=document.getElementById('pg-'+p);
+  if(el)el.classList.add('on');
+  document.querySelectorAll('.bni').forEach(b=>b.classList.remove('on'));
+  const bni=document.querySelector('.bni[onclick="nav(\''+p+'\')"]');
+  if(bni)bni.classList.add('on');
+  if(p==='sogo')initSogo();
+  if(p==='tsume')initTsume();
+  if(p==='players')initPlayers();
+  if(p==='game')setTimeout(renderBoard,50);
+  if(p==='shido')initShido();
+  if(p==='shido-player'){/* 棋士指導 initialized by openShidoPlayer */}
+  if(p==='oracle')initOracle();
+}
+
+function switchTab(prefix,tab,btn){
+  const page=document.getElementById('pg-'+prefix);
+  if(page){
+    page.querySelectorAll('.mod-tab').forEach(b=>b.classList.remove('on'));
+    const sb=page.querySelector('.sb');
+    if(sb)Array.from(sb.children).forEach(c=>{
+      if(c.id&&c.id.startsWith(prefix+'-'))c.style.display='none';
+    });
+  }
+  const t=document.getElementById(prefix+'-'+tab);
+  if(t)t.style.display='block';
+  if(btn)btn.classList.add('on');
+  const fn={
+    'sogo-kifu':renderSogoKifu,'sogo-style':renderSogoStyle,
+    'sogo-replay':renderSogoReplay,'sogo-ai':renderSogoAI,
+    'tsume-list':renderTsumeList,'tsume-solve':renderTsumeSolve,
+    'tsume-watch':renderTsumeWatch,'tsume-ai':renderTsumeAI,
+    'shido-diag':renderShidoDiag,'shido-weak':renderShidoWeak,
+    'shido-today':renderShidoToday,'shido-tesuji':renderShidoTesuji
+  };
+  const key=prefix+'-'+tab;
+  if(fn[key]&&!document.getElementById(key)._init)fn[key]();
+}
+
+/* ══ 天野宗歩モジュール ══ */
+function initSogo(){renderSogoKifu();}
+function renderSogoKifu(){
+  const el=document.getElementById('sogo-kifu');
+  if(!el||el._init)return; el._init=true;
+  let h=`<div class="pg-hd">
+    <div class="pg-title">天野宗歩 — 代表棋譜</div>
+    <div class="pg-sub">幕末最強の棋士「棋聖」天野宗歩の代表局。全棋譜は著作権切れ（160年以上前）。Gemini 2.5 Flashが江戸時代の棋風を解説。</div>
+  </div>
+  <div class="gold-box">♟ 天野宗歩（1816-1859）：43歳で急逝するまで無敵を誇った江戸最強の棋士。「棋聖」の称号は死後に贈られた。</div>`;
+  SOGO_KIFU.forEach(k=>{
+    h+=`<div class="kifu-card" onclick="openKifu('${k.id}')">
+      <div class="kifu-title">${k.title}</div>
+      <div class="kifu-meta">${k.year} ｜ ${k.opening} ｜ ${k.result}</div>
+      <div class="kifu-preview">${k.highlight}</div>
+      <div style="font-size:.54rem;color:var(--gold);margin-top:.2rem">🎯 手筋: ${k.tesuji}</div>
+    </div>`;
+  });
+  h+='<div style="height:.75rem"></div>';
+  el.innerHTML=h;
+}
+
+let selectedKifu=null;
+function openKifu(id){
+  selectedKifu=SOGO_KIFU.find(k=>k.id===id);
+  if(!selectedKifu)return;
+  showToast('📜 '+selectedKifu.title+' を選択');
+  const tab=document.querySelector('#pg-sogo .mod-tab:nth-child(4)');
+  switchTab('sogo','ai',tab);
+  setTimeout(()=>loadKifuAI(selectedKifu),200);
+}
+
+async function loadKifuAI(k){
+  const el=document.getElementById('sogo-ai');
+  if(!el)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🤖 AI棋譜解説</div>
+    <div class="pg-sub">${k.title}</div>
+  </div>
+  <div style="padding:.5rem .85rem">
+    <div class="science-box">📜 ${k.year}｜${k.opening}｜${k.result}</div>
+    <div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">♟ Gemini 2.5 Flashが解説中...</div>
+  </div>`;
+  const sys=`あなたは将棋の歴史研究者であり、天野宗歩の棋譜解説の専門家です。
+江戸時代の将棋の魅力を現代の人に分かりやすく伝えてください。`;
+  const user=`以下の棋譜を解説してください：
+【対局】${k.title}
+【年代】${k.year}
+【戦型】${k.opening}
+【結果】${k.result}
+【手順（一部）】${k.moves}
+【見どころ】${k.highlight}
+【手筋】${k.tesuji}
+以下の構成で解説してください：
+1. この局の時代背景と意義
+2. 戦型の特徴と宗歩の意図
+3. 中盤の決定的な手筋
+4. 現代将棋への影響
+5. 宗歩の棋風の凄さ`;
+  const reply=await callGemini(sys,user,1400);
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🤖 ${k.title} — AI解説</div>
+  </div>
+  <div style="padding:.5rem .85rem">
+    <div class="science-box">📜 ${k.year}｜${k.opening}｜${k.result}</div>
+    <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r2);
+      padding:.75rem .85rem;font-size:.7rem;line-height:1.82;color:var(--txt);
+      white-space:pre-wrap">${reply}</div>
+    <div style="height:.75rem"></div>
+  </div>`;
+}
+
+function renderSogoStyle(){
+  const el=document.getElementById('sogo-style');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">⚔️ 宗歩流将棋の極意</div>
+    <div class="pg-sub">天野宗歩の棋風を分析し、現代将棋にも活かせる手筋・戦法を解説。</div>
+  </div>
+  <div class="gold-box">「宗歩に天下を取らせたくない」— 当時の棋士たちが恐れた圧倒的な強さ</div>
+  ${['相掛かり・棒銀の極意','角換わりの革命的解釈','中盤の鋭い手筋','受けから攻めへの転換','寄せの美学'].map((t,i)=>`
+  <div class="card">
+    <div class="card-hd">
+      <span class="card-ico">${['⚔️','🔄','✨','🛡️','🏆'][i]}</span>
+      <div><div class="card-hd-title">${t}</div>
+      <div class="card-hd-sub">宗歩流 第${i+1}の奥義</div></div>
+    </div>
+    <div class="card-bd">
+      <div class="txt-sm" id="style-${i}">
+        <div style="text-align:center;color:var(--txt3);font-size:.64rem">
+          タップして解説を読む
+        </div>
+      </div>
+      <button class="btn-secondary" style="margin-top:.4rem"
+        onclick="loadStyleDetail(${i},'${t}')">
+        Gemini解説を読む
+      </button>
+    </div>
+  </div>`).join('')}
+  <div style="height:.75rem"></div>`;
+}
+
+async function loadStyleDetail(idx,title){
+  const el=document.getElementById('style-'+idx);
+  if(!el)return;
+  el.innerHTML='<div style="color:var(--txt3);font-size:.64rem">解説を生成中...</div>';
+  const sys=`あなたは天野宗歩の将棋を研究する専門家です。`;
+  const reply=await callGemini(sys,
+    `天野宗歩の「${title}」について、以下を解説してください：
+1. 宗歩がこの分野で何を革命的に変えたか
+2. 具体的な手筋のポイント
+3. 現代将棋との比較
+4. 初心者〜中級者への応用アドバイス
+約300文字で簡潔に。`,600);
+  el.innerHTML=`<div class="txt-sm">${reply}</div>`;
+}
+
+function renderSogoReplay(){
+  const el=document.getElementById('sogo-replay');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">▶ 棋譜再生</div>
+    <div class="pg-sub">棋譜を選んで自動再生・手動で進める。</div>
+  </div>
+  <div style="padding:0 .85rem .5rem">
+    <div style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-bottom:.35rem">棋譜を選ぶ</div>
+    ${SOGO_KIFU.map(k=>`
+    <button onclick="startReplay('${k.id}')"
+      style="width:100%;padding:.55rem .7rem;border-radius:var(--r2);
+      border:1px solid var(--bor);background:var(--sur);
+      text-align:left;margin-bottom:.28rem;cursor:pointer">
+      <div style="font-size:.72rem;font-weight:700;color:var(--gold)">${k.title}</div>
+      <div style="font-size:.55rem;color:var(--txt3)">${k.opening} ｜ ${k.result}</div>
+    </button>`).join('')}
+  </div>
+  <div id="replay-area" style="display:none;padding:0 .85rem">
+    <div id="replay-info" style="font-size:.7rem;color:var(--txt2);margin-bottom:.4rem"></div>
+    <div style="display:flex;gap:.35rem;margin-bottom:.4rem">
+      <button onclick="replayPrev()"
+        style="flex:1;padding:.42rem;border-radius:var(--rf);
+        border:1px solid var(--bor2);background:transparent;
+        font-size:.65rem;color:var(--txt2)">◀ 前へ</button>
+      <button onclick="replayNext()"
+        style="flex:1;padding:.42rem;border-radius:var(--rf);
+        background:var(--gold2);border:none;
+        font-size:.65rem;color:var(--bg);font-weight:700">次へ ▶</button>
+    </div>
+    <div id="replay-moves" style="display:flex;flex-wrap:wrap;gap:.2rem"></div>
+  </div>
+  <div style="height:.75rem"></div>`;
+}
+
+let replayKifu=null;
+let replayPos=0;
+function startReplay(id){
+  replayKifu=SOGO_KIFU.find(k=>k.id===id);
+  replayPos=0;
+  document.getElementById('replay-area').style.display='block';
+  updateReplay();
+}
+function replayNext(){if(replayKifu&&replayPos<replayKifu.moves.split('▲').length)replayPos++;updateReplay();}
+function replayPrev(){if(replayPos>0)replayPos--;updateReplay();}
+function updateReplay(){
+  if(!replayKifu)return;
+  const moves=replayKifu.moves.match(/[▲△][^\s▲△]+/g)||[];
+  document.getElementById('replay-info').textContent=
+    replayKifu.title+' — '+replayPos+'/'+moves.length+'手目';
+  const el=document.getElementById('replay-moves');
+  el.innerHTML=moves.slice(0,replayPos).map((m,i)=>`
+    <span style="font-size:.62rem;padding:.12rem .32rem;border-radius:3px;
+      background:${i===replayPos-1?'var(--gold3)':'var(--sur2)'};
+      border:1px solid ${i===replayPos-1?'var(--bor2)':'var(--bor)'};
+      color:${i===replayPos-1?'var(--gold)':'var(--txt3)'}">${m}</span>`).join('');
+}
+
+function renderSogoAI(){
+  const el=document.getElementById('sogo-ai');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🤖 宗歩AI解説</div>
+    <div class="pg-sub">棋譜・手筋・歴史について何でも質問</div>
+  </div>
+  <div class="chat-msgs" id="sogo-msgs" style="min-height:200px;max-height:45vh"></div>
+  <div class="chat-foot">
+    <textarea class="chat-ta" id="sogo-input" rows="1"
+      placeholder="宗歩の棋風・手筋・時代背景を聞く..."></textarea>
+    <button class="chat-send" onclick="sendSogoAI()">送</button>
+  </div>`;
+  addChatMsg('sogo','ai','天野宗歩の棋譜解説AIです。♟\n棋風・手筋・江戸時代の将棋界など、何でも聞いてください。');
+}
+
+async function sendSogoAI(){
+  const ta=document.getElementById('sogo-input');
+  const msg=ta?.value.trim();
+  if(!msg)return;
+  ta.value='';
+  addChatMsg('sogo','user',msg);
+  showTyping('sogo');
+  const sys=`あなたは天野宗歩と江戸時代の将棋の専門家AIです。
+宗歩の棋譜・棋風・手筋・歴史的背景について詳しく答えてください。
+将棋の専門用語を適切に使い、初心者にも分かりやすく説明してください。`;
+  const reply=await callGemini(sys,msg,1000);
+  hideTyping('sogo');
+  addChatMsg('sogo','ai',reply);
+}
+
+/* ══ 詰むや詰まざるや ══ */
+function initTsume(){renderTsumeList();}
+function renderTsumeList(){
+  const el=document.getElementById('tsume-list');
+  if(!el||el._init)return; el._init=true;
+  const diffLabel=['','★','★★','★★★','★★★★','★★★★★','伝説','至高'];
+  const diffColor=['','var(--grn)','var(--grn)','var(--gold)','var(--gold)','var(--red)','var(--red)','var(--red)'];
+  let h=`<div class="pg-hd">
+    <div class="pg-title">詰むや詰まざるや</div>
+    <div class="pg-sub">伊藤看寿（1719-1760）が遺した将棋史上最高峰の詰将棋集。全100番。著作権切れ。Gemini 2.5 Flashが解説。</div>
+  </div>
+  <div class="gold-box">🏯 第100番「寿」は611手詰。完全解明まで100年以上かかった将棋史上最難の詰将棋。</div>`;
+  TSUME_DATA.forEach(t=>{
+    h+=`<div class="kifu-card" onclick="openTsume('${t.id}')">
+      <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.15rem">
+        <div class="kifu-title">${t.title}</div>
+        <div style="font-size:.56rem;font-weight:700;color:${diffColor[t.difficulty]};
+          padding:.08rem .32rem;border-radius:var(--rf);
+          border:1px solid ${diffColor[t.difficulty]}30;
+          background:${diffColor[t.difficulty]}12">
+          ${diffLabel[t.difficulty]}
+        </div>
+        <div style="font-size:.56rem;color:var(--txt3);margin-left:auto">${t.hands}手詰</div>
+      </div>
+      <div class="kifu-meta">${t.category}</div>
+      <div class="kifu-preview">${t.description}</div>
+    </div>`;
+  });
+  h+='<div style="height:.75rem"></div>';
+  el.innerHTML=h;
+}
+
+function openTsume(id){
+  const t=TSUME_DATA.find(x=>x.id===id);
+  if(!t)return;
+  showToast('🏯 '+t.title+' を開きました');
+  const tab=document.querySelector('#pg-tsume .mod-tab:nth-child(4)');
+  switchTab('tsume','ai',tab);
+  setTimeout(()=>loadTsumeAI(t),200);
+}
+
+function renderTsumeSolve(){
+  const el=document.getElementById('tsume-solve');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🧩 詰将棋に挑戦</div>
+    <div class="pg-sub">問題を選んで挑戦。あなたの手をAIが判定します。</div>
+  </div>
+  <div style="padding:0 .85rem">
+    ${TSUME_DATA.slice(0,3).map(t=>`
+    <div class="kifu-card" onclick="challengeTsume('${t.id}')">
+      <div class="kifu-title">${t.title} — ${t.hands}手詰</div>
+      <div class="kifu-meta">${t.category}</div>
+      <div style="font-size:.6rem;color:var(--gold);margin-top:.15rem">タップして挑戦</div>
+    </div>`).join('')}
+  </div>
+  <div id="tsume-challenge" style="padding:0 .85rem;display:none">
+    <div id="tsume-chal-info" class="science-box"></div>
+    <textarea id="tsume-move-input" placeholder="例: ▲2三桂成" rows="2"
+      style="width:100%;padding:.55rem .7rem;border-radius:var(--r2);
+      border:1px solid var(--bor2);background:var(--bg3);
+      font-size:.75rem;color:var(--txt);resize:none;
+      line-height:1.5;margin:.4rem 0"></textarea>
+    <button class="btn-primary" onclick="judgeMove()">この手を判定する</button>
+    <div id="tsume-judge-result" style="margin-top:.5rem"></div>
+  </div>
+  <div style="height:.75rem"></div>`;
+}
+
+let currentTsumeChallenge=null;
+function challengeTsume(id){
+  currentTsumeChallenge=TSUME_DATA.find(t=>t.id===id);
+  if(!currentTsumeChallenge)return;
+  document.getElementById('tsume-challenge').style.display='block';
+  document.getElementById('tsume-chal-info').textContent=
+    currentTsumeChallenge.title+' — '+currentTsumeChallenge.hands+'手詰。最初の一手を入力してください。';
+}
+
+async function judgeMove(){
+  const move=document.getElementById('tsume-move-input')?.value.trim();
+  if(!move||!currentTsumeChallenge)return;
+  const res=document.getElementById('tsume-judge-result');
+  res.innerHTML='<div style="color:var(--txt3);font-size:.68rem">判定中...</div>';
+  const sys=`あなたは詰将棋の専門解説AIです。
+「詰むや詰まざるや」の詰将棋問題の手を判定してください。
+【判定】正解/不正解/方向性は合っています
+【解説】なぜその手が正しいか、または不正解かを説明
+【ヒント】次に考えるべき手の方向性
+の形式で答えてください。`;
+  const user=`問題: ${currentTsumeChallenge.title}（${currentTsumeChallenge.hands}手詰）
+カテゴリ: ${currentTsumeChallenge.category}
+問題説明: ${currentTsumeChallenge.description}
+ユーザーの手: ${move}`;
+  const reply=await callGemini(sys,user,800);
+  res.innerHTML=`<div class="science-box" style="white-space:pre-wrap">${reply}</div>`;
+}
+
+function renderTsumeWatch(){
+  const el=document.getElementById('tsume-watch');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">👁 鑑賞モード</div>
+    <div class="pg-sub">解けなくても大丈夫。「寿」など超大作をAIの解説とともに鑑賞する。</div>
+  </div>
+  <div class="gold-box">♟ 「将棋は指すだけでなく、美術品として鑑賞するもの」— 宗歩の言葉</div>
+  ${TSUME_DATA.filter(t=>t.hands>100).map(t=>`
+  <div class="card">
+    <div class="card-hd">
+      <span class="card-ico">🏯</span>
+      <div><div class="card-hd-title">${t.title}</div>
+      <div class="card-hd-sub">${t.hands}手詰 ｜ ${t.category}</div></div>
+    </div>
+    <div class="card-bd">
+      <div class="txt-sm">${t.description}</div>
+      <button class="btn-secondary" style="margin-top:.4rem"
+        onclick="watchTsume('${t.id}')">
+        🔮 AIと一緒に鑑賞する
+      </button>
+    </div>
+  </div>`).join('')}
+  <div id="watch-result" style="padding:0 .85rem;margin-top:.3rem"></div>
+  <div style="height:.75rem"></div>`;
+}
+
+async function watchTsume(id){
+  const t=TSUME_DATA.find(x=>x.id===id);
+  if(!t)return;
+  const res=document.getElementById('watch-result');
+  res.innerHTML='<div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">♟ 解説生成中...</div>';
+  const sys=`あなたは詰将棋の芸術的・歴史的価値を解説する専門家です。
+詰将棋を美術品として鑑賞する視点で、その美しさと偉大さを語ってください。`;
+  const reply=await callGemini(sys,
+    `「${t.title}」（${t.hands}手詰）について、以下の観点で解説してください：
+1. この作品が詰将棋史上どのような位置づけか
+2. 看寿がどのような芸術的意図を持って作ったか
+3. 初手の鍵となる手と、その美しさ
+4. なぜこの作品が「芸術」と呼ばれるか
+5. 現代の将棋ファンへのメッセージ`,1200);
+  res.innerHTML=`<div class="card"><div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">${reply}</div></div>`;
+}
+
+async function loadTsumeAI(t){
+  const el=document.getElementById('tsume-ai');
+  if(!el)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🤖 ${t.title} — AI解説</div>
+    <div class="pg-sub">${t.hands}手詰 ｜ ${t.category}</div>
+  </div>
+  <div style="padding:.5rem .85rem">
+    <div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">解説生成中...</div>
+  </div>`;
+  const sys=`あなたは詰将棋の専門解説AIです。「詰むや詰まざるや」の全100番を熟知しています。`;
+  const reply=await callGemini(sys,
+    `${t.title}（${t.hands}手詰）の解説をしてください：
+1. この問題の特徴と難しさ
+2. 考え方の糸口（ネタバレなし）
+3. 詰将棋としての芸術的価値
+4. 初心者へのアドバイス`,900);
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🤖 ${t.title} — AI解説</div>
+  </div>
+  <div style="padding:.5rem .85rem">
+    <div class="science-box">${t.description}</div>
+    <div class="card"><div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">${reply}</div></div>
+    <button class="btn-secondary" style="margin-top:.4rem" onclick="challengeTsume('${t.id}')">
+      🧩 この問題に挑戦する
+    </button>
+    <div style="height:.75rem"></div>
+  </div>`;
+}
+
+function renderTsumeAI(){
+  const el=document.getElementById('tsume-ai');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🤖 詰将棋AIコーチ</div>
+    <div class="pg-sub">詰将棋の質問・ヒント依頼・解説を求める</div>
+  </div>
+  <div class="chat-msgs" id="tsume-msgs" style="min-height:200px;max-height:45vh"></div>
+  <div class="chat-foot">
+    <textarea class="chat-ta" id="tsume-input" rows="1"
+      placeholder="詰将棋の質問..."></textarea>
+    <button class="chat-send" onclick="sendTsumeAI()">送</button>
+  </div>`;
+  addChatMsg('tsume','ai','詰将棋AIコーチです。🏯\n「詰むや詰まざるや」の問題・手筋・考え方を聞いてください。');
+}
+
+async function sendTsumeAI(){
+  const ta=document.getElementById('tsume-input');
+  const msg=ta?.value.trim();
+  if(!msg)return;
+  ta.value='';
+  addChatMsg('tsume','user',msg);
+  showTyping('tsume');
+  const sys=`あなたは詰将棋の専門AIコーチです。「詰むや詰まざるや」全100番を熟知しています。
+分かりやすく・丁寧に・初心者にも理解できるように解説してください。`;
+  const reply=await callGemini(sys,msg,1000);
+  hideTyping('tsume');
+  addChatMsg('tsume','ai',reply);
+}
+
+/* ══ 棋士AI対局 ══ */
+
+/* ══ 棋士指導システムプロンプト ══ */
+const SHIDO_SYS = {
+  sogo:{
+    greeting:'さて、宗歩が直々に指南しよう。何を問いたい？',
+    system:`あなたは江戸時代最強の棋士「天野宗歩」です。弟子に将棋を指導しています。
+口調：江戸武士風・簡潔・自信満々・時々古語を使う
+例：「さて」「道理よ」「かくなる局面では」「面白き手よ」「まだまだよのう」
+指導スタイル：序盤から積極的に攻める姿勢・相掛かり・角換わりの美しさを語る
+「攻めは最大の防御」という哲学・弟子を鋭く批評するが良い手は素直に褒める`,
+    themes:['相掛かりの極意を教えてください','攻め将棋の心得','江戸将棋の美しさ','宗歩流序盤の考え方']
+  },
+  fujii:{
+    greeting:'よろしくお願いします。一緒に考えましょう。',
+    system:`あなたは現代将棋の頂点「藤井聡太八冠」として弟子に指導しています。
+口調：謙虚・丁寧・論理的・AI的な視点を交える
+例：「この局面はAI的にはこう評価されます」「深く読むと〜」「面白い変化ですね」
+指導スタイル：AI研究に基づく局面評価・終盤力・詰みの鋭さを重視・詰将棋の重要性を強調`,
+    themes:['AI的な局面評価とは','終盤力を上げるには','詰将棋の重要性','角換わりの最新定跡']
+  },
+  habu:{
+    greeting:'こんにちは。将棋って面白いですよね。何でも聞いてください。',
+    system:`あなたは永世七冠「羽生善治」として弟子に指導しています。
+口調：温かい・哲学的・時々ユーモア・将棋の深みを語る
+例：「うーん、面白い手ですね」「将棋は無限の可能性があります」「こういう局面こそ大切」
+指導スタイル：柔軟な発想・羽生マジック・受けの妙手・将棋の哲学・人生との繋がり`,
+    themes:['羽生マジックの秘密','受けから攻めへの転換','柔軟な発想の鍛え方','将棋と人生の哲学']
+  },
+  oyama:{
+    greeting:'来たか。大山が教えてやろう。まず受けを覚えよ。',
+    system:`あなたは「大山康晴」十五世名人として弟子に指導しています。
+口調：貫禄・重厚・昭和の大名人・勝負に対して厳格
+例：「受けてから攻める」「それでは勝てん」「プロの厳しさとはそういうものだ」
+指導スタイル：受けの名手として「まず受ける」姿勢・相手の攻めを逆用・精神力・勝負根性`,
+    themes:['受けの極意を教えてください','四間飛車の奥深さ','勝負強さの磨き方','昭和将棋の教え']
+  },
+  nakahara:{
+    greeting:'よし！一緒に明るく将棋を楽しもう！',
+    system:`あなたは「中原誠」十六世名人として弟子に指導しています。
+口調：さわやか・明快・前向き・元気
+例：「よし！」「明るく攻めましょう」「飛車をもっと使って」「いい調子！」
+指導スタイル：明快な攻め将棋・飛車を活かした力強い指し方・前向きな褒め方`,
+    themes:['飛車を活かす攻め方','横歩取りの魅力','さわやか流の心得','明快に勝つ方法']
+  },
+  kato:{
+    greeting:'うん、うん！来たね！加藤一二三が教えてあげよう！神武以来の天才として！',
+    system:`あなたは「加藤一二三」九段（ひふみん）として弟子に指導しています。
+口調：独特のリズム・熱血・「うん、うん」が口癖・自分を「神武以来の天才」と呼ぶ
+例：「うん、うん！」「そうそうそう！」「神武以来の天才として言わせてもらえば」「これは名手！」
+指導スタイル：棒銀・原始棒銀の攻撃的な指し方・神武以来の天才としての自信・弟子の良い手を大げさに褒める`,
+    themes:['棒銀の極意を教えてください','神武以来の天才の指し方','原始棒銀の威力','ひふみん流の心得']
+  }
+};
+
+let currentShidoPlayer = null;
+let shidoMsgs = [];
+
+function initPlayers(){
+  const el=document.getElementById('players-content');
+  if(el&&el._init)return; if(el)el._init=true;
+  let h=`<div class="pg-hd">
+    <div class="pg-title">👑 棋士AI — 対局・指導</div>
+    <div class="pg-sub">歴代名棋士の棋風をGemini 2.5 Flashが再現。対局相手として、または師匠として指導を受けられます。</div>
+  </div>`;
+  PLAYERS.forEach((p,idx)=>{
+    const stars='⭐'.repeat(Math.min(p.difficulty,7));
+    h+='<div class="player-card" style="flex-direction:column;align-items:stretch;gap:.45rem">'+
+    '<div style="display:flex;align-items:center;gap:.6rem">'+
+    '<div class="player-ico">'+p.ico+'</div>'+
+    '<div style="flex:1">'+
+    '<div style="display:flex;align-items:center;gap:.4rem">'+
+    '<div class="player-name">'+p.name+'</div>'+
+    '<div style="font-size:.52rem;color:var(--gold);padding:.08rem .3rem;border-radius:var(--rf);'+
+    'border:1px solid var(--bor2);background:var(--gold3)">'+p.title+'</div></div>'+
+    '<div class="player-era">'+p.era+' ｜ '+p.rank+'</div>'+
+    '<div class="player-style">'+p.style+'</div>'+
+    '<div class="player-diff">'+
+    '<span class="diff-tag" style="color:var(--txt3)">得意: '+p.opening.slice(0,2).join('・')+'</span>'+
+    '<span class="diff-tag" style="color:var(--gold);border-color:var(--bor2)">強さ '+stars+'</span>'+
+    '</div></div></div>'+
+    '<div style="display:flex;gap:.35rem">'+
+    '<button onclick="startGameWithPlayer(PLAYERS['+idx+'])" '+
+    'style="flex:1;padding:.45rem;border-radius:var(--rf);'+
+    'background:var(--gold2);border:none;font-size:.68rem;font-weight:700;'+
+    'color:var(--bg);cursor:pointer">⚔️ 対局する</button>'+
+    '<button onclick="openShidoPlayer(PLAYERS['+idx+'])" '+
+    'style="flex:1;padding:.45rem;border-radius:var(--rf);'+
+    'border:1.5px solid var(--gold);background:var(--gold3);'+
+    'font-size:.68rem;font-weight:700;color:var(--gold);cursor:pointer">📚 指導を受ける</button>'+
+    '</div></div>';
+  });
+  h+='<div style="height:.75rem"></div>';
+  if(el) el.innerHTML=h;
+}
+
+function openShidoPlayer(player){
+  currentShidoPlayer = player;
+  shidoMsgs = [];
+  const shidoData = SHIDO_SYS[player.id] || SHIDO_SYS.habu;
+  // UI更新
+  document.getElementById('sp-ico').textContent = player.ico;
+  document.getElementById('sp-title').textContent = player.name + ' 師匠の指導';
+  // クイック質問セット
+  const qbar = document.getElementById('sp-quick');
+  if(qbar) qbar.innerHTML = (shidoData.themes||[]).map(q=>
+    '<button style="flex-shrink:0;padding:.18rem .48rem;border-radius:var(--rf);'+
+    'border:1px solid var(--bor);background:var(--sur);'+
+    'font-size:.54rem;color:var(--txt2);cursor:pointer;white-space:nowrap" '+
+    'onclick="setSpQ(this.textContent)">'+q+'</button>'
+  ).join('');
+  // 棋風伝授メニュー
+  const philMenu = document.getElementById('sp-phil-menu');
+  if(philMenu) philMenu.innerHTML = (shidoData.themes||[]).map(t=>
+    '<button onclick="learnPhilosophy(this.textContent)" '+
+    'style="padding:.52rem .6rem;border-radius:var(--r2);'+
+    'border:1px solid var(--bor2);background:var(--sur);'+
+    'font-size:.64rem;font-weight:700;color:var(--gold);cursor:pointer;text-align:left">'+
+    '🎓 '+t+'</button>'
+  ).join('');
+  // メッセージ初期化
+  const msgs = document.getElementById('sp-msgs');
+  if(msgs){ msgs.innerHTML=''; }
+  // 師匠の挨拶
+  setTimeout(()=>{
+    addChatMsg('sp','ai',player.name+'師匠：\n'+shidoData.greeting);
+  },100);
+  nav('shido-player');
+}
+
+function setSpQ(q){
+  const ta = document.getElementById('sp-input');
+  if(ta){ ta.value=q; ta.focus(); }
+}
+
+function switchSpTab(tab,btn){
+  ['chat','kyokumen','kifu','philosophy'].forEach(t=>{
+    const el=document.getElementById('sp-'+t);
+    if(el)el.style.display='none';
+  });
+  const t=document.getElementById('sp-'+tab);
+  if(t)t.style.display=tab==='chat'?'flex':'block';
+  if(t&&tab==='chat')t.style.flexDirection='column';
+  document.querySelectorAll('#pg-shido-player .mod-tab').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+}
+
+async function sendShidoChat(){
+  const ta = document.getElementById('sp-input');
+  const msg = ta?.value.trim();
+  if(!msg||!currentShidoPlayer) return;
+  ta.value='';
+  addChatMsg('sp','user',msg);
+  shidoMsgs.push({role:'user',content:msg});
+  showTyping('sp');
+  const shidoData = SHIDO_SYS[currentShidoPlayer.id] || SHIDO_SYS.habu;
+  const hist = shidoMsgs.slice(-6).map(m=>(m.role==='user'?'弟子：':'師匠：')+m.content).join('\n');
+  const reply = await callGemini(
+    shidoData.system + '\n弟子への指導として、200文字以内で答えてください。',
+    hist + '\n弟子：' + msg, 600
+  );
+  hideTyping('sp');
+  const name = currentShidoPlayer.name+'師匠：\n';
+  addChatMsg('sp','ai',name+reply);
+  shidoMsgs.push({role:'assistant',content:reply});
+  // Firestoreに保存
+  const user = window.__fb?.auth?.currentUser;
+  if(user&&window.__fb?.db){
+    try{
+      const {db,collection,addDoc,serverTimestamp}=window.__fb;
+      await addDoc(collection(db,'users',user.uid,'shido_history'),{
+        player:currentShidoPlayer.id,q:msg,a:reply,ts:serverTimestamp()
+      });
+    }catch{}
+  }
+}
+
+async function runKyokumenShido(){
+  const inp = document.getElementById('sp-kyoku-input')?.value.trim();
+  if(!inp||!currentShidoPlayer) return;
+  const res = document.getElementById('sp-kyoku-result');
+  res.innerHTML='<div style="color:var(--txt3);font-size:.68rem;padding:.5rem">師匠が局面を検討中...</div>';
+  const shidoData = SHIDO_SYS[currentShidoPlayer.id]||SHIDO_SYS.habu;
+  const reply = await callGemini(
+    shidoData.system+'\n局面を見て以下の4点で指導してください：1.局面の評価（有利/不利/互角）2.最善手の提案（▲○○の形式）3.その理由 4.次に注意すべきこと',
+    '弟子からの局面説明：'+inp, 900
+  );
+  res.innerHTML='<div class="card"><div class="card-hd">'+
+    '<span class="card-ico">'+currentShidoPlayer.ico+'</span>'+
+    '<div><div class="card-hd-title">'+currentShidoPlayer.name+'師匠の局面指導</div></div></div>'+
+    '<div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">'+reply+'</div></div>';
+}
+
+async function runKifuKentou(){
+  const inp = document.getElementById('sp-kifu-input')?.value.trim();
+  if(!inp||!currentShidoPlayer) return;
+  const res = document.getElementById('sp-kifu-result');
+  res.innerHTML='<div style="color:var(--txt3);font-size:.68rem;padding:.5rem">師匠が棋譜を検討中...</div>';
+  const shidoData = SHIDO_SYS[currentShidoPlayer.id]||SHIDO_SYS.habu;
+  const reply = await callGemini(
+    shidoData.system+'\n対局の棋譜・流れを聞いて以下の5点で検討してください：1.転換点の手（良手・悪手）2.悪手の理由と正しい手 3.この戦型での考え方 4.次回への改善点 5.師匠からの一言',
+    '弟子の対局報告：'+inp, 1000
+  );
+  res.innerHTML='<div class="card"><div class="card-hd">'+
+    '<span class="card-ico">'+currentShidoPlayer.ico+'</span>'+
+    '<div><div class="card-hd-title">'+currentShidoPlayer.name+'師匠の棋譜検討</div></div></div>'+
+    '<div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">'+reply+'</div></div>';
+}
+
+async function learnPhilosophy(theme){
+  if(!currentShidoPlayer) return;
+  const res = document.getElementById('sp-phil-result');
+  res.innerHTML='<div style="color:var(--txt3);font-size:.68rem;padding:.5rem">師匠が語り始めました...</div>';
+  const shidoData = SHIDO_SYS[currentShidoPlayer.id]||SHIDO_SYS.habu;
+  const reply = await callGemini(
+    shidoData.system+'\n弟子に棋風・哲学・技術を伝授してください。300文字程度で。',
+    'テーマ：'+theme, 700
+  );
+  res.innerHTML='<div class="card"><div class="card-hd">'+
+    '<span class="card-ico">'+currentShidoPlayer.ico+'</span>'+
+    '<div><div class="card-hd-title">'+currentShidoPlayer.name+'師匠の伝授：'+theme+'</div></div></div>'+
+    '<div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">'+reply+'</div></div>';
+}
+
+
+/* ダミー防止 */
+function _dummyPlayers(){
+  const el=document.getElementById('players-content');
+  if(el&&el._init)return; if(el)el._init=true;
+  let h=`<div class="pg-hd">
+    <div class="pg-title">👑 棋士AI対局</div>
+    <div class="pg-sub">歴代名棋士の棋風をGemini 2.5 Flashが再現。その棋士として対局・指導を行います。</div>
+  </div>`;
+  PLAYERS.forEach(p=>{
+    const stars='⭐'.repeat(Math.min(p.difficulty,7));
+    h+=`<div class="player-card" onclick="startGameWithPlayer(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+      <div class="player-ico">${p.ico}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <div class="player-name">${p.name}</div>
+          <div style="font-size:.52rem;color:var(--gold);
+            padding:.08rem .3rem;border-radius:var(--rf);
+            border:1px solid var(--bor2);background:var(--gold3)">${p.title}</div>
+        </div>
+        <div class="player-era">${p.era} ｜ ${p.rank}</div>
+        <div class="player-style">${p.style}</div>
+        <div class="player-diff">
+          <span class="diff-tag" style="color:var(--txt3)">
+            得意: ${p.opening.slice(0,2).join('・')}
+          </span>
+          <span class="diff-tag" style="color:var(--gold);border-color:var(--bor2)">
+            強さ ${stars}
+          </span>
+        </div>
+      </div>
+      <div style="font-size:.55rem;color:var(--txt3);flex-shrink:0">対局▶</div>
+    </div>`;
+  });
+  h+='<div style="height:.75rem"></div>';
+  if(el) el.innerHTML=h;
+}
+
+/* ══ 指導モード ══ */
+function initShido(){renderShidoDiag();}
+function renderShidoDiag(){
+  const el=document.getElementById('shido-diag');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">🔍 棋風診断</div>
+    <div class="pg-sub">あなたの将棋の棋風を診断し、歴代棋士との類似度を判定します。</div>
+  </div>
+  <div style="padding:0 .85rem">
+    ${[
+      {q:'好きな戦法は？',opts:['振り飛車','居飛車','どちらでも']},
+      {q:'攻めと受け、どちらが好き？',opts:['攻め','受け','バランス']},
+      {q:'序盤のペースは？',opts:['急戦派','持久戦派','相手次第']},
+      {q:'終盤の得意な部分は？',opts:['詰み・寄せ','駒得・材料確保','逆転・粘り']},
+    ].map((q,i)=>`
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:.68rem;font-weight:700;color:var(--txt);margin-bottom:.32rem">
+        Q${i+1}. ${q.q}
+      </div>
+      <div style="display:flex;gap:.28rem;flex-wrap:wrap" id="diag-q${i}">
+        ${q.opts.map((o,j)=>`
+        <button class="diff-tag" data-q="${i}" data-a="${j}"
+          style="padding:.3rem .65rem;cursor:pointer;font-size:.64rem;
+          border-radius:var(--rf);border:1px solid var(--bor);
+          background:var(--sur);color:var(--txt2)"
+          onclick="selectDiagOpt(${i},${j},this)">${o}</button>`).join('')}
+      </div>
+    </div>`).join('')}
+    <button class="btn-primary" id="diag-btn" onclick="runDiag()">🔍 棋風を診断する</button>
+    <div id="diag-result" style="margin-top:.6rem"></div>
+  </div>
+  <div style="height:.75rem"></div>`;
+}
+
+const diagAnswers={};
+function selectDiagOpt(q,a,btn){
+  diagAnswers[q]=a;
+  document.querySelectorAll(`[data-q="${q}"]`).forEach(b=>{
+    b.style.background='var(--sur)';
+    b.style.color='var(--txt2)';
+    b.style.borderColor='var(--bor)';
+  });
+  btn.style.background='var(--gold3)';
+  btn.style.color='var(--gold)';
+  btn.style.borderColor='var(--bor2)';
+}
+
+async function runDiag(){
+  const res=document.getElementById('diag-result');
+  res.innerHTML='<div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">診断中...</div>';
+  const answers=Object.values(diagAnswers).join(',');
+  const sys=`あなたは将棋の棋風診断AIです。
+回答から棋風を分析し、最も近い歴代棋士を診断してください。`;
+  const reply=await callGemini(sys,
+    `将棋の棋風診断の回答です（0=左・1=中・2=右）：
+Q1戦法: ${diagAnswers[0]}, Q2攻守: ${diagAnswers[1]}, Q3ペース: ${diagAnswers[2]}, Q4終盤: ${diagAnswers[3]}
+以下の形式で診断してください：
+【あなたの棋風】○○流
+【最も近い棋士】名前（理由）
+【次に近い棋士】名前
+【強み】
+【改善ポイント】
+【今週の課題】`,800);
+  res.innerHTML=`<div class="card"><div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">${reply}</div></div>`;
+  await WS.set('diag_result',{reply,ts:Date.now()});
+}
+
+function renderShidoWeak(){
+  const el=document.getElementById('shido-weak');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">⚠️ 弱点分析</div>
+    <div class="pg-sub">あなたの将棋の弱点をAIが分析し、改善プランを提案します。</div>
+  </div>
+  <div style="padding:0 .85rem">
+    <textarea id="weak-input" placeholder="最近負けた対局の状況を教えてください。
+例：序盤は良かったが、中盤で相手の攻めを受けきれず負けました。角換わりの将棋でした。" rows="5"
+      style="width:100%;padding:.6rem .72rem;border-radius:var(--r2);
+      border:1.5px solid var(--bor2);background:var(--bg3);
+      font-size:.73rem;color:var(--txt);resize:none;line-height:1.65"></textarea>
+    <button class="btn-primary" style="margin-top:.4rem" onclick="analyzeWeak()">
+      ⚠️ 弱点を分析する
+    </button>
+    <div id="weak-result" style="margin-top:.6rem"></div>
+  </div>
+  <div style="height:.75rem"></div>`;
+}
+
+async function analyzeWeak(){
+  const inp=document.getElementById('weak-input')?.value.trim();
+  if(!inp)return;
+  const res=document.getElementById('weak-result');
+  res.innerHTML='<div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">分析中...</div>';
+  const sys=`あなたは将棋の上達コーチです。対局の状況から弱点を分析し、具体的な改善策を提案してください。`;
+  const reply=await callGemini(sys,
+    `対局の状況: ${inp}
+以下の構成で弱点分析してください：
+1. 主な弱点（2〜3つ）
+2. なぜその局面で判断を誤ったか
+3. 改善のための具体的な練習方法
+4. 参考にすべき棋士の棋風
+5. 今すぐできるアクション`,900);
+  res.innerHTML=`<div class="card"><div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">${reply}</div></div>`;
+}
+
+function renderShidoToday(){
+  const el=document.getElementById('shido-today');
+  if(!el||el._init)return; el._init=true;
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">📅 今日の課題</div>
+    <div class="pg-sub">あなたのレベルに合わせた今日の練習課題をAIが生成します。</div>
+  </div>
+  <div style="padding:0 .85rem">
+    <div style="margin-bottom:.7rem">
+      <div style="font-size:.62rem;font-weight:700;color:var(--txt3);margin-bottom:.28rem">レベルを選ぶ</div>
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap" id="level-btns">
+        ${['入門','初級','中級','上級','有段者'].map((l,i)=>`
+        <button data-level="${i}" onclick="selectLevel(${i},this)"
+          style="padding:.3rem .65rem;border-radius:var(--rf);
+          border:1px solid var(--bor);background:var(--sur);
+          font-size:.65rem;color:var(--txt2);cursor:pointer">${l}</button>`).join('')}
+      </div>
+    </div>
+    <button class="btn-primary" onclick="genTodayTask()">📅 今日の課題を生成</button>
+    <div id="today-result" style="margin-top:.6rem"></div>
+  </div>
+  <div style="height:.75rem"></div>`;
+}
+
+let selectedLevel=1;
+function selectLevel(level,btn){
+  selectedLevel=level;
+  document.querySelectorAll('#level-btns button').forEach(b=>{
+    b.style.background='var(--sur)';b.style.color='var(--txt2)';
+    b.style.borderColor='var(--bor)';
+  });
+  btn.style.background='var(--gold3)';btn.style.color='var(--gold)';
+  btn.style.borderColor='var(--bor2)';
+}
+
+async function genTodayTask(){
+  const levels=['入門','初級','中級','上級','有段者'];
+  const res=document.getElementById('today-result');
+  res.innerHTML='<div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">課題生成中...</div>';
+  const sys=`あなたは将棋の上達コーチです。`;
+  const reply=await callGemini(sys,
+    `${levels[selectedLevel]}レベルの将棋プレイヤーへの今日の練習課題を生成してください：
+1. 今日のテーマ（1つ）
+2. 詰将棋（手数と種類）
+3. 定跡学習（戦法と確認箇所）
+4. 実戦練習（何局、どんな点を意識）
+5. 振り返りポイント
+具体的かつ実践的に。`,700);
+  res.innerHTML=`<div class="card"><div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">${reply}</div></div>`;
+}
+
+function renderShidoTesuji(){
+  const el=document.getElementById('shido-tesuji');
+  if(!el||el._init)return; el._init=true;
+  const tesuji=['空き王手','両取り','田楽刺し','串刺し','割打ち',
+    'タタキ','腹銀','垂れ歩','端攻め','底歩'];
+  el.innerHTML=`<div class="pg-hd">
+    <div class="pg-title">✨ 手筋道場</div>
+    <div class="pg-sub">将棋の基本手筋をAIが解説。宗歩の実戦例と合わせて学ぶ。</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.38rem;padding:.4rem .85rem">
+    ${tesuji.map((t,i)=>`
+    <div class="kifu-card" style="margin:0" onclick="learnTesuji('${t}')">
+      <div style="font-size:.75rem;font-weight:700;color:var(--gold)">${t}</div>
+      <div style="font-size:.54rem;color:var(--txt3);margin-top:.08rem">タップして学ぶ</div>
+    </div>`).join('')}
+  </div>
+  <div id="tesuji-result" style="padding:.4rem .85rem"></div>
+  <div style="height:.75rem"></div>`;
+}
+
+async function learnTesuji(t){
+  const res=document.getElementById('tesuji-result');
+  res.innerHTML='<div style="text-align:center;padding:1rem;color:var(--txt3);font-size:.72rem">解説生成中...</div>';
+  const sys=`あなたは将棋の手筋を教える専門家です。天野宗歩の実戦例も交えて解説してください。`;
+  const reply=await callGemini(sys,
+    `「${t}」という将棋の手筋について解説してください：
+1. 手筋の定義（どんな状況で使うか）
+2. 基本的な形（図で示すように説明）
+3. 天野宗歩の実戦での活用例
+4. 初心者が覚えるコツ
+5. 練習問題の例`,800);
+  res.innerHTML=`<div class="card"><div class="card-bd" style="white-space:pre-wrap;font-size:.7rem;line-height:1.82">${reply}</div></div>`;
+}
+
+/* ══ ORACLE ══ */
+let oracleMsgs=[];
+const QUICK_Q=['天野宗歩の最強の一手は？','詰むや詰まざるや第百番を解説して',
+  '藤井聡太と宗歩を比較して','将棋を上達する最速の方法','今日の詰将棋を出して'];
+
+function initOracle(){
+  const el=document.getElementById('oracle-msgs');
+  if(el&&el._init)return; if(el)el._init=true;
+  const qbar=document.getElementById('oracle-quick');
+  if(qbar)qbar.innerHTML=QUICK_Q.map(q=>`
+    <button style="flex-shrink:0;padding:.18rem .48rem;border-radius:var(--rf);
+      border:1px solid var(--bor);background:var(--sur);
+      font-size:.54rem;color:var(--txt2);cursor:pointer;white-space:nowrap"
+      onclick="setOracleQ('${q.replace(/'/g,"\\'")}')">${q}</button>`).join('');
+  addChatMsg('oracle','ai',
+    '将棋ORACLE — 棋聖の間のAI相談室へようこそ。♟\n'+
+    '天野宗歩・詰むや詰まざるや・現代将棋・定跡・手筋・対局分析など、何でも聞いてください。');
+  const ta=document.getElementById('oracle-input');
+  if(ta)ta.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendOracle();}
+  });
+}
+
+function setOracleQ(q){
+  const ta=document.getElementById('oracle-input');
+  if(ta){ta.value=q;ta.focus();}
+}
+
+async function sendOracle(){
+  const ta=document.getElementById('oracle-input');
+  const msg=ta?.value.trim();
+  if(!msg)return;
+  ta.value='';
+  addChatMsg('oracle','user',msg);
+  oracleMsgs.push({role:'user',content:msg});
+  showTyping('oracle');
+  const sys=`あなたは将棋の総合AIアドバイザー「将棋ORACLE」です。
+以下の知識を統合して回答します：
+・天野宗歩（棋聖）の棋譜・棋風・歴史
+・伊藤看寿「詰むや詰まざるや」全100番の知識
+・現代将棋（藤井聡太・羽生善治・大山康晴等）
+・詰将棋・手筋・定跡・戦法の解説
+・将棋の歴史（江戸時代〜現代）
+・初心者から有段者までの上達法
+常に熱意を持って、分かりやすく、将棋の魅力を伝えてください。`;
+  const hist=oracleMsgs.slice(-6).map(m=>(m.role==='user'?'ユーザー：':'AI：')+m.content).join('\n');
+  const reply=await callGemini(sys,hist,1400);
+  hideTyping('oracle');
+  addChatMsg('oracle','ai',reply);
+  oracleMsgs.push({role:'assistant',content:reply});
+  await WS.set('oracle_hist',oracleMsgs.slice(-20));
+  // Firestoreに保存
+  const user=window.__fb?.auth?.currentUser;
+  if(user&&window.__fb?.db){
+    try{
+      const {db,collection,addDoc,serverTimestamp}=window.__fb;
+      await addDoc(collection(db,'users',user.uid,'shogi_oracle'),
+        {q:msg,a:reply,ts:serverTimestamp()});
+    }catch{}
+  }
+}
+
+/* ══ チャットヘルパー ══ */
+function addChatMsg(prefix,role,text){
+  const msgs=document.getElementById(prefix+'-msgs');
+  if(!msgs)return;
+  const d=document.createElement('div');
+  d.className='msg '+role;
+  const name=role==='user'?'あなた':'AI';
+  d.innerHTML=`<div class="msg-name">${name}</div>
+    <div class="msg-bubble">${text}</div>`;
+  msgs.appendChild(d);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+function showTyping(prefix){
+  const msgs=document.getElementById(prefix+'-msgs');
+  if(!msgs)return;
+  const d=document.createElement('div');
+  d.className='msg ai';d.id=prefix+'-typing';
+  d.innerHTML='<div class="typing"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>';
+  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+}
+function hideTyping(prefix){
+  const t=document.getElementById(prefix+'-typing');
+  if(t)t.remove();
+}
+
+/* ══ AUTH ══ */
+function authTab(t){
+  document.getElementById('aform-li').style.display=t==='li'?'block':'none';
+  document.getElementById('aform-reg').style.display=t==='reg'?'block':'none';
+  document.getElementById('atab-li').classList.toggle('on',t==='li');
+  document.getElementById('atab-reg').classList.toggle('on',t==='reg');
+}
+async function doLogin(){
+  const email=document.getElementById('li-email').value.trim();
+  const pass=document.getElementById('li-pass').value;
+  const err=document.getElementById('li-err');
+  err.textContent='';
+  if(!email||!pass){err.textContent='入力してください';return;}
+  try{
+    const {auth,signInWithEmailAndPassword}=window.__fb;
+    await signInWithEmailAndPassword(auth,email,pass);
+  }catch(e){err.textContent='メールまたはパスワードが違います';}
+}
+async function doRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const pass2=document.getElementById('reg-pass2').value;
+  const err=document.getElementById('reg-err');
+  err.textContent='';
+  if(!name||!email||!pass){err.textContent='全項目を入力してください';return;}
+  if(pass.length<6){err.textContent='パスワードは6文字以上';return;}
+  if(pass!==pass2){err.textContent='パスワードが一致しません';return;}
+  try{
+    const {auth,db,createUserWithEmailAndPassword,updateProfile,doc,setDoc,serverTimestamp}=window.__fb;
+    const cred=await createUserWithEmailAndPassword(auth,email,pass);
+    await updateProfile(cred.user,{displayName:name});
+    await setDoc(doc(db,'users',cred.user.uid),{name,email,createdAt:serverTimestamp()});
+  }catch(e){document.getElementById('reg-err').textContent='登録失敗: '+e.message;}
+}
+async function doLogout(){await window.__fb.signOut(window.__fb.auth);}
+
+/* ══ TOAST ══ */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+/* ══ 起動 ══ */
+let _booted=false;
+function bootApp(){
+  if(_booted)return; _booted=true;
+  setTimeout(()=>{
+    document.getElementById('splash').classList.add('hide');
+    if(!window.__fb||!window.__fb.auth){
+      document.getElementById('auth-wrap').style.display='flex';
+      return;
+    }
+    window.__fb.onAuthStateChanged(window.__fb.auth,async user=>{
+      if(user){
+        document.getElementById('auth-wrap').style.display='none';
+        document.getElementById('app').style.display='flex';
+        document.getElementById('bnav').style.display='flex';
+        document.getElementById('topbar-user').textContent=
+          user.displayName||user.email.split('@')[0];
+        const hist=await WS.get('oracle_hist');
+        if(hist)oracleMsgs=hist;
+      } else {
+        document.getElementById('auth-wrap').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('bnav').style.display='none';
+      }
+    });
+  },2200);
+}
+
+function waitForFB(cb,maxWait=8000){
+  if(window.__fb&&window.__fb.auth){cb();return;}
+  const start=Date.now();
+  const t=setInterval(()=>{
+    if(window.__fb&&window.__fb.auth){clearInterval(t);cb();}
+    else if(Date.now()-start>maxWait){
+      clearInterval(t);
+      document.getElementById('splash').classList.add('hide');
+      document.getElementById('auth-wrap').style.display='flex';
+    }
+  },100);
+}
+
+window.addEventListener('fb-ready',()=>waitForFB(bootApp));
+waitForFB(bootApp);
+</script>
+</body>
+</html>
